@@ -1,0 +1,32 @@
+{
+  "name": "@crawl-kit/verification",
+  "version": "0.1.0",
+  "description": "Core: post-reconciliation verification. Reads unified.json → adjudicated Findings/Verdicts.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "run": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@crawl-kit/contract": "workspace:*",
+    "@crawl-kit/reconciler": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  },
+  "private": true
+}

@@ -1,0 +1,28 @@
+{
+  "name": "crawl-kit-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Tells you whether the software you intended, built, and run are the same software.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.28.1",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "demo": "pnpm --filter @crawl-kit/intent emit && pnpm --filter @crawl-kit/structure emit && pnpm --filter @crawl-kit/reconciler run run && pnpm --filter @crawl-kit/verification run run",
+    "verify": "pnpm --filter @crawl-kit/verification run run",
+    "serve": "pnpm --filter @crawl-kit/viewer dev",
+    "crawl-kit": "pnpm --filter @tanago3/crawl-kit start --",
+    "release": "pnpm -r build && pnpm -r publish --access public --no-git-checks",
+    "clean": "pnpm -r exec rm -rf dist"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

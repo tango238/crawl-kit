@@ -1,0 +1,10 @@
+{
+  "concepts": [
+    { "name": "Order",    "kind": "aggregate-root", "attributes": ["id", "customerId", "total", "status", "placedAt"], "dependsOn": ["Customer"] },
+    { "name": "Customer", "kind": "aggregate-root", "attributes": ["id", "name", "email"] },
+    { "name": "Product",  "kind": "aggregate-root", "attributes": ["id", "name", "price", "sku"] },
+    { "name": "Payment",  "kind": "aggregate-root", "attributes": ["id", "orderId", "amount", "method"], "dependsOn": ["Order"] },
+    { "name": "Shipment", "kind": "aggregate-root", "attributes": ["id", "orderId", "address", "carrier"], "dependsOn": ["Order"] },
+    { "name": "Refund",   "kind": "entity",         "attributes": ["id", "paymentId", "amount"], "dependsOn": ["Payment"] }
+  ]
+}

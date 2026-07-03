@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bounded Contexts</title><style>:root{--bg:#0f172a;--card:#1e293b;--line:#334155;--txt:#e2e8f0;--muted:#94a3b8;--accent:#7dd3fc}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,'Hiragino Kaku Gothic ProN','Segoe UI',sans-serif;line-height:1.75}
+nav.top{position:sticky;top:0;z-index:10;background:#0b1220;border-bottom:1px solid var(--line);padding:10px 24px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+nav.top .brand{font-weight:700;font-size:14px;margin-right:12px;color:#fff}
+nav.top a{color:var(--muted);text-decoration:none;font-size:13px;padding:5px 11px;border-radius:7px;white-space:nowrap}
+nav.top a:hover{background:#172033;color:var(--txt)}
+nav.top a.active{background:#334155;color:#fff;font-weight:600}
+main{max-width:1000px;margin:0 auto;padding:32px 28px 96px}
+main img{max-width:100%;height:auto;border-radius:12px;border:1px solid var(--line);display:block;margin:18px auto}
+h1{font-size:26px;border-bottom:2px solid var(--line);padding-bottom:12px;margin-top:8px}
+h2{font-size:20px;border-bottom:1px solid var(--line);padding-bottom:7px;margin-top:38px}
+h3{font-size:16px;margin-top:28px;color:#cbd5e1}h4{font-size:14px;margin-top:20px;color:#cbd5e1}
+a{color:var(--accent)}p,li{font-size:14.5px}
+code{background:#0b1220;padding:2px 7px;border-radius:5px;font-size:13px;font-family:ui-monospace,Menlo,monospace}
+pre{background:#0b1220;border:1px solid var(--line);border-radius:10px;padding:16px;overflow:auto;font-size:12.5px;line-height:1.55}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;width:100%;margin:16px 0;font-size:13px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--card);font-weight:600}tr:nth-child(even) td{background:#172033}
+blockquote{border-left:4px solid #475569;margin:16px 0;padding:4px 18px;color:var(--muted);background:#131c2e;border-radius:0 8px 8px 0}
+hr{border:none;border-top:1px solid var(--line);margin:32px 0}
+ul,ol{padding-left:24px}li{margin:4px 0}strong{color:#f1f5f9}
+footer{max-width:1000px;margin:0 auto;padding:20px 28px 60px;color:var(--muted);font-size:12px;border-top:1px solid var(--line)}
+
+figure.jig-graph{margin:18px 0;background:#0b1220;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+figure.jig-graph .jig-toolbar{display:flex;gap:6px;justify-content:flex-end;padding:8px 10px;border-bottom:1px solid var(--line);background:#0d1526}
+figure.jig-graph .jig-toolbar button{background:#172033;color:var(--muted);border:1px solid var(--line);border-radius:6px;font-size:12px;padding:3px 9px;cursor:pointer}
+figure.jig-graph .jig-toolbar button:hover{background:#1e293b;color:var(--txt)}
+figure.jig-graph .jig-canvas{padding:16px;overflow:auto;text-align:center}
+figure.jig-graph .jig-canvas svg{max-width:100%;height:auto}
+figure.jig-graph .jig-fallback{background:none;border:none;text-align:left;color:var(--muted);margin:0}
+</style></head><body>
+<nav class="top"><span class="brand">crawl-kit ドメインモデル</span><a href="discovery.html">ディスカバリ</a><a href="event-storming.html">イベントストーミング</a><a href="bounded-contexts.html" class="active">境界づけられたコンテキスト</a><a href="context-map.html">コンテキストマップ</a><a href="aggregates.html">集約</a><a href="domain-events.html">ドメインイベント</a><a href="sync.html">モデル⇔実装 Sync</a></nav>
+<main>
+<h1 id="bounded-contexts">Bounded Contexts</h1>
+<blockquote>由来: <a href="./discovery.html">discovery.md</a>（Core=検証）＋ <a href="./event-storming.html">event-storming.md</a><br>（Verification を reconciliation の後段へ／behavior=観測のみ／Adjudication は別文脈）。</blockquote>
+<h2 id="context-map">Context Map 概要図</h2>
+<figure class="jig-graph" data-kind="context-map">
+  <div class="jig-toolbar"><button type="button" data-act="dir" title="Switch direction">⇄</button><button type="button" data-act="svg" title="Download SVG">⬇ SVG</button><button type="button" data-act="src" title="Copy DOT source">⧉ DOT</button></div>
+  <script type="text/vnd.graphviz">digraph context_map {
+  rankdir="LR";
+  bgcolor="transparent";
+  node [shape=box, style=filled, fontname="sans-serif", fontsize=12, fillcolor="#1e293b", color="#94a3b8", fontcolor="#e2e8f0", margin="0.18,0.10"];
+  edge [fontname="sans-serif", fontsize=10, color="#94a3b8", fontcolor="#cbd5e1"];
+  "Verification（検証＋裁定）— **Core**" [label="Verification（検証＋裁定）— **Core**", color="#22c55e", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "Observation（観測）— Supporting" [label="Observation（観測）— Supporting", color="#3b82f6", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "Structure Extraction（構造抽出）— Supporting" [label="Structure Extraction（構造抽出）— Supporting", color="#f59e0b", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "Intent（意図）— **Generic/External**（非所有）" [label="Intent（意図）— **Generic/External**（非所有）", color="#a855f7", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "Reconciliation（照合）— Supporting" [label="Reconciliation（照合）— Supporting", color="#ec4899", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "Convergence / Known-state（収束）— Supporting（横断）" [label="Convergence / Known-state（収束）— Supporting（横断）", color="#14b8a6", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "Reporting（報告）— Generic" [label="Reporting（報告）— Generic", color="#ef4444", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "Scenario Lifecycle（シナリオ育成）— Supporting" [label="Scenario Lifecycle（シナリオ育成）— Supporting", color="#eab308", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "Spine / Contract（背骨）— Generic" [label="Spine / Contract（背骨）— Generic", color="#22c55e", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "**Spine/Contract**" [label="**Spine/Contract**", color="#3b82f6", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "全文脈" [label="全文脈", color="#f59e0b", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "Intent(外部)" [label="Intent(外部)", color="#a855f7", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "Reconciliation" [label="Reconciliation", color="#ec4899", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "Structure Extraction" [label="Structure Extraction", color="#14b8a6", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "Observation" [label="Observation", color="#ef4444", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "**Reconciliation**" [label="**Reconciliation**", color="#eab308", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "**Verification**" [label="**Verification**", color="#22c55e", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "Scenario Lifecycle" [label="Scenario Lifecycle", color="#3b82f6", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "Verification" [label="Verification", color="#f59e0b", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "Convergence" [label="Convergence", color="#a855f7", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "Reporting" [label="Reporting", color="#ec4899", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "Spine" [label="Spine", color="#14b8a6", fillcolor="#1e293b", penwidth="1.3", style="filled"];
+  "**Spine/Contract**" -> "全文脈" [label="SK · 型 ＋ atomic validated I/O", dir="both"];
+  "Intent(外部)" -> "Reconciliation" [label="C/S · `intent.nodes.json`", arrowhead="diamond"];
+  "Structure Extraction" -> "Reconciliation" [label="C/S · `structure.nodes.json`"];
+  "Observation" -> "Reconciliation" [label="C/S · `behavior.nodes.json`"];
+  "**Reconciliation**" -> "**Verification**" [label="C/S · `unified.json` ＋ `registry`"];
+  "Scenario Lifecycle" -> "Verification" [label="C/S · active scenarios"];
+  "Convergence" -> "Verification" [label="P · `known-findings`（双方向）", dir="both"];
+  "Verification" -> "Reporting" [label="C/S · findings/verdicts"];
+  "Verification" -> "Spine" [label="PL · emit（verdict/finding ノード）"];
+  "Reconciliation" -> "Convergence" [label="SW · —", color="#ef4444", fontcolor="#fca5a5", penwidth="2.0"];
+}</script>
+  <div class="jig-canvas"><pre class="jig-fallback">digraph context_map {
+  rankdir=&quot;LR&quot;;
+  bgcolor=&quot;transparent&quot;;
+  node [shape=box, style=filled, fontname=&quot;sans-serif&quot;, fontsize=12, fillcolor=&quot;#1e293b&quot;, color=&quot;#94a3b8&quot;, fontcolor=&quot;#e2e8f0&quot;, margin=&quot;0.18,0.10&quot;];
+  edge [fontname=&quot;sans-serif&quot;, fontsize=10, color=&quot;#94a3b8&quot;, fontcolor=&quot;#cbd5e1&quot;];
+  &quot;Verification（検証＋裁定）— **Core**&quot; [label=&quot;Verification（検証＋裁定）— **Core**&quot;, color=&quot;#22c55e&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;Observation（観測）— Supporting&quot; [label=&quot;Observation（観測）— Supporting&quot;, color=&quot;#3b82f6&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;Structure Extraction（構造抽出）— Supporting&quot; [label=&quot;Structure Extraction（構造抽出）— Supporting&quot;, color=&quot;#f59e0b&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;Intent（意図）— **Generic/External**（非所有）&quot; [label=&quot;Intent（意図）— **Generic/External**（非所有）&quot;, color=&quot;#a855f7&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;Reconciliation（照合）— Supporting&quot; [label=&quot;Reconciliation（照合）— Supporting&quot;, color=&quot;#ec4899&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;Convergence / Known-state（収束）— Supporting（横断）&quot; [label=&quot;Convergence / Known-state（収束）— Supporting（横断）&quot;, color=&quot;#14b8a6&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;Reporting（報告）— Generic&quot; [label=&quot;Reporting（報告）— Generic&quot;, color=&quot;#ef4444&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;Scenario Lifecycle（シナリオ育成）— Supporting&quot; [label=&quot;Scenario Lifecycle（シナリオ育成）— Supporting&quot;, color=&quot;#eab308&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;Spine / Contract（背骨）— Generic&quot; [label=&quot;Spine / Contract（背骨）— Generic&quot;, color=&quot;#22c55e&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;**Spine/Contract**&quot; [label=&quot;**Spine/Contract**&quot;, color=&quot;#3b82f6&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;全文脈&quot; [label=&quot;全文脈&quot;, color=&quot;#f59e0b&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;Intent(外部)&quot; [label=&quot;Intent(外部)&quot;, color=&quot;#a855f7&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;Reconciliation&quot; [label=&quot;Reconciliation&quot;, color=&quot;#ec4899&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;Structure Extraction&quot; [label=&quot;Structure Extraction&quot;, color=&quot;#14b8a6&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;Observation&quot; [label=&quot;Observation&quot;, color=&quot;#ef4444&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;**Reconciliation**&quot; [label=&quot;**Reconciliation**&quot;, color=&quot;#eab308&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;**Verification**&quot; [label=&quot;**Verification**&quot;, color=&quot;#22c55e&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;Scenario Lifecycle&quot; [label=&quot;Scenario Lifecycle&quot;, color=&quot;#3b82f6&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;Verification&quot; [label=&quot;Verification&quot;, color=&quot;#f59e0b&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;Convergence&quot; [label=&quot;Convergence&quot;, color=&quot;#a855f7&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;Reporting&quot; [label=&quot;Reporting&quot;, color=&quot;#ec4899&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;Spine&quot; [label=&quot;Spine&quot;, color=&quot;#14b8a6&quot;, fillcolor=&quot;#1e293b&quot;, penwidth=&quot;1.3&quot;, style=&quot;filled&quot;];
+  &quot;**Spine/Contract**&quot; -&gt; &quot;全文脈&quot; [label=&quot;SK · 型 ＋ atomic validated I/O&quot;, dir=&quot;both&quot;];
+  &quot;Intent(外部)&quot; -&gt; &quot;Reconciliation&quot; [label=&quot;C/S · `intent.nodes.json`&quot;, arrowhead=&quot;diamond&quot;];
+  &quot;Structure Extraction&quot; -&gt; &quot;Reconciliation&quot; [label=&quot;C/S · `structure.nodes.json`&quot;];
+  &quot;Observation&quot; -&gt; &quot;Reconciliation&quot; [label=&quot;C/S · `behavior.nodes.json`&quot;];
+  &quot;**Reconciliation**&quot; -&gt; &quot;**Verification**&quot; [label=&quot;C/S · `unified.json` ＋ `registry`&quot;];
+  &quot;Scenario Lifecycle&quot; -&gt; &quot;Verification&quot; [label=&quot;C/S · active scenarios&quot;];
+  &quot;Convergence&quot; -&gt; &quot;Verification&quot; [label=&quot;P · `known-findings`（双方向）&quot;, dir=&quot;both&quot;];
+  &quot;Verification&quot; -&gt; &quot;Reporting&quot; [label=&quot;C/S · findings/verdicts&quot;];
+  &quot;Verification&quot; -&gt; &quot;Spine&quot; [label=&quot;PL · emit（verdict/finding ノード）&quot;];
+  &quot;Reconciliation&quot; -&gt; &quot;Convergence&quot; [label=&quot;SW · —&quot;, color=&quot;#ef4444&quot;, fontcolor=&quot;#fca5a5&quot;, penwidth=&quot;2.0&quot;];
+}</pre></div>
+</figure>
+<h2 id="bounded-context">Bounded Context 一覧</h2>
+<h3 id="verification-core">Verification（検証＋裁定）— <strong>Core</strong></h3>
+<ul><li><strong>責務</strong>: reconcile 済みの三層（unified）と実行中アプリを突き合わせて検証し <strong>Finding</strong> を生み、</li></ul>
+<p><strong>その場で反証パネルにかけて Verdict まで下す</strong>（検証と裁定は一連・同一文脈）。</p>
+<ul><li><strong>主要概念</strong>: <code>Finding</code>(Diff/Verify)、<code>Expectation</code>、<code>Conformance</code>、<code>Scenario</code>(実行)、<code>Run</code>、</li></ul>
+<p>＋（裁定）<code>RefuterVote</code>、<code>Lens</code>(correctness/security/intentionality)、<code>Verdict</code>(bug/unnecessary/uncertain)、<code>Confidence</code>。</p>
+<ul><li><strong>ユビキタス言語</strong>: 検証 / 期待 / 適合・不適合 / カテゴリ(layout/security/access-control/conditional/registered-data/error-handling) / 入力探索 / 反証 / レンズ / 確信度。</li><li><strong>位置</strong>: reconciliation の<strong>後段</strong>。入力 = <code>unified.json + registry + 実行アプリ</code>。</li><li><strong>note</strong>: 反証ゲート（偽陽性を殺す trust）は <strong>Core の内部ステージ</strong>として統合（ユーザー決定: 1 BC にまとめる）。</li></ul>
+<p>Reconciliation の同一性裁定とは引き続き<strong>別文脈</strong>（"Verdict" の語義が異なる＝境界維持。divergence #5）。</p>
+<ul><li><strong>由来コード</strong>: loop-e2e の verify/explore/scenario/refute（behavior から分離予定 = divergence #6）。</li></ul>
+<h3 id="observation-supporting">Observation（観測）— Supporting</h3>
+<ul><li><strong>責務</strong>: 実行中アプリをクロールし、ページを LLM で構造化して <strong>as-run の事実</strong>を出す（検証はしない）。</li><li><strong>主要概念</strong>: <code>Crawl</code>、<code>Page</code>/<code>PageInfo</code>、<code>SiteStructure</code>、<code>Transition</code>。</li><li><strong>UL</strong>: クロール / ページ / 遷移 / 表示項目・入力項目 / 能力・期待。</li><li><strong>由来コード</strong>: loop-e2e collect + services/browser + 構造化（= 縮小後の packages/behavior）。</li></ul>
+<h3 id="structure-extraction-supporting">Structure Extraction（構造抽出）— Supporting</h3>
+<ul><li><strong>責務</strong>: ソースを静的解析し <strong>as-built モデル</strong>（entity/route/usecase/CRUD/topology）を出す。</li><li><strong>主要概念</strong>: <code>Entity</code>、<code>Route</code>、<code>Usecase</code>、<code>Crud</code>、<code>Correction</code>(補正オーバーレイ)。</li><li><strong>由来コード</strong>: packages/structure（rdra-analyzer 移植）。</li></ul>
+<h3 id="intent-generic-external">Intent（意図）— <strong>Generic/External</strong>（非所有）</h3>
+<ul><li><strong>責務</strong>: ユビキタス言語＝正準名・正準ID を供給する。</li><li><strong>主要概念</strong>: <code>Concept</code>、<code>CanonicalName</code>、<code>Glossary</code>。</li><li><strong>note</strong>: distill-ddd が供給。crawl-kit は所有しない（discovery: D が非コアな理由）。</li></ul>
+<h3 id="reconciliation-supporting">Reconciliation（照合）— Supporting</h3>
+<ul><li><strong>責務</strong>: 三層を正準IDで結合し、同一性を裁定・分類して <code>unified</code> を出す。人の判断を registry に焼き込む。</li><li><strong>主要概念</strong>: <code>Concept</code>/<code>ConceptId</code>、<code>Evidence</code>、<code>ConceptState</code>、<code>Relation</code>、<code>Registry</code>、<code>Unified</code>、<code>Decision</code>。</li><li><strong>note</strong>: 検証の<strong>期待を整える土台</strong>。intent 辺(8状態/ADR)は intent 非所有ゆえ Supporting（discovery divergence #3）。</li></ul>
+<h3 id="convergence-known-state-supporting">Convergence / Known-state（収束）— Supporting（横断）</h3>
+<ul><li><strong>責務</strong>: feedback を検証し known-findings に焼き込み、同じ Finding を再浮上させない（burn-in）。</li><li><strong>主要概念</strong>: <code>Feedback</code>、<code>KnownFinding</code>、<code>Fingerprint</code>。</li><li><strong>note</strong>: Reconciliation の decisions/corrections と<strong>並行する焼き込み機構</strong>（別実装・統合しない）。</li></ul>
+<h3 id="reporting-generic">Reporting（報告）— Generic</h3>
+<ul><li><strong>責務</strong>: Finding/Verdict を集約しレポート化、GitHub issue 化。</li><li><strong>主要概念</strong>: <code>Report</code>、<code>Activity</code>、<code>Issue</code>。</li></ul>
+<h3 id="scenario-lifecycle-supporting">Scenario Lifecycle（シナリオ育成）— Supporting</h3>
+<ul><li><strong>責務</strong>: クロール＋ソース理解から検証シナリオ草案を出し（grow）、人が採用（approve）。</li><li><strong>主要概念</strong>: <code>Scenario</code>(proposed/active)、<code>Coverage</code>。</li></ul>
+<h3 id="spine-contract-generic">Spine / Contract（背骨）— Generic</h3>
+<ul><li><strong>責務</strong>: 全文脈が依存する共有型・正準レジストリ・atomic I/O・emit。</li><li><strong>主要概念</strong>: <code>LayerNode</code>、<code>Registry</code>、<code>Unified</code>、<code>emit</code>。</li></ul>
+<h2 id="">言語の境界で発見した事実（同じ語が文脈で別の意味）</h2>
+<ul><li><strong>Verdict</strong>: Adjudication=「この Finding はバグか」（FindingVerdict）／ Reconciliation=「これは同じ概念か」（ConceptState）。<strong>同語・別意味 → 別 BC を裏付け</strong>。</li><li><strong>Evidence</strong>: Reconciliation=マッチ信号(name/attributes/topology)／ Adjudication=RefuterVote。別物。</li><li><strong>Finding（検証の食い違い）</strong> ≠ <strong>Divergence（reconcile の層またぎ差分）</strong>。近いが別概念。</li><li><strong>burn-in</strong>: Convergence(known-findings) と Reconciliation(decisions/corrections) の<strong>二系統</strong>（別文脈で並存）。</li></ul>
+<h2 id="">サブドメイン分類</h2>
+<table><thead><tr><th>種別</th><th>BC</th></tr></thead><tbody><tr><td><strong>Core</strong></td><td>Verification（検証＋裁定。反証ゲートを内部に含む）</td></tr><tr><td><strong>Supporting</strong></td><td>Observation / Structure Extraction / Reconciliation / Convergence / Scenario Lifecycle</td></tr><tr><td><strong>Generic/External</strong></td><td>Intent(distill-ddd) / Reporting / Spine・Contract</td></tr></tbody></table>
+<p>→ 全 <strong>8 BC</strong>（Verification と Adjudication を統合）。</p>
+<h2 id="">決定済み</h2>
+<ul><li><strong>Verification ＝ 1 BC</strong>（検証と裁定を統合）。反証ゲートは Core の内部ステージ＝<strong>Core</strong>。</li><li>Reconciliation とは別文脈を維持（"Verdict" の語義差が境界の根拠）。</li></ul>
+<h2 id="">未解決の問い</h2>
+<ul><li>Convergence の burn-in と Reconciliation の burn-in を<strong>共有ライブラリ化</strong>するか（語彙は別のまま）。</li><li>検証の「期待」に intent をどこまで使うか（intent 非所有のため最小依存に留めるか）。</li></ul>
+</main>
+<footer>crawl-kit ドメインモデル &nbsp;|&nbsp; source: <code>docs/domain/bounded-contexts.md</code> &nbsp;|&nbsp; generated by /ddd publish</footer>
+<script src="./_assets/viz-standalone.js"></script>
+<script>
+(function(){
+  var graphs=document.querySelectorAll('figure.jig-graph');
+  if(!graphs.length) return;
+  // Copy-DOT works without the renderer, so bind it unconditionally (the
+  // documented graceful-degradation path when viz-standalone.js is absent).
+  graphs.forEach(function(g){
+    var node=g.querySelector('script[type="text/vnd.graphviz"]');
+    if(!node) return;
+    var src=node.textContent, b=g.querySelector('[data-act=src]');
+    if(b) b.onclick=function(){ if(navigator.clipboard) navigator.clipboard.writeText(src); };
+  });
+  if(!(window.Viz&&window.Viz.instance)) return;  // no renderer: keep DOT fallback
+  window.Viz.instance().then(function(viz){
+    graphs.forEach(function(g){
+      var node=g.querySelector('script[type="text/vnd.graphviz"]');
+      if(!node) return;
+      var src=node.textContent, dir='LR', canvas=g.querySelector('.jig-canvas');
+      function render(){
+        var dot=src.replace(/rankdir\s*=\s*"?(LR|TB)"?/,'rankdir="'+dir+'"');
+        try{var svg=viz.renderSVGElement(dot);canvas.innerHTML='';canvas.appendChild(svg);}
+        catch(e){/* keep fallback */}
+      }
+      render();
+      var b;
+      if((b=g.querySelector('[data-act=dir]'))) b.onclick=function(){dir=(dir==='LR'?'TB':'LR');render();};
+      if((b=g.querySelector('[data-act=svg]'))) b.onclick=function(){
+        var s=canvas.querySelector('svg'); if(!s) return;
+        var blob=new Blob([s.outerHTML],{type:'image/svg+xml'});
+        var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+        a.download=(g.dataset.kind||'diagram')+'.svg';document.body.appendChild(a);a.click();a.remove();
+      };
+    });
+  });
+})();
+</script>
+</body></html>

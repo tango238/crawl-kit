@@ -1,0 +1,306 @@
+{
+  "generatedAt": "2026-06-28T07:22:57.110Z",
+  "unifiedRef": "2026-06-28T07:22:56.574Z",
+  "findings": [
+    {
+      "id": "VF-001",
+      "fingerprint": "runtime-error:order",
+      "conceptId": "concept:order",
+      "discrepancy": {
+        "category": "runtime-error",
+        "severity": "high",
+        "expected": "実行時にエラーが起きない",
+        "actual": "GET /orders/777: 5xx on missing order (500)",
+        "evidence": "GET /orders/777: 5xx on missing order (500)",
+        "location": "Order"
+      },
+      "verdict": {
+        "classification": "bug",
+        "confidence": 0.85,
+        "confirmedCount": 3,
+        "panelSize": 3,
+        "votes": [
+          {
+            "lens": "correctness",
+            "refuted": false,
+            "classification": "bug",
+            "confidence": 0.85,
+            "rationale": "correctness: 実行時にエラーが起きない ≠ GET /orders/777: 5xx on missing order (500)"
+          },
+          {
+            "lens": "security",
+            "refuted": false,
+            "classification": "bug",
+            "confidence": 0.85,
+            "rationale": "security: 実行時にエラーが起きない ≠ GET /orders/777: 5xx on missing order (500)"
+          },
+          {
+            "lens": "intentionality",
+            "refuted": false,
+            "classification": "bug",
+            "confidence": 0.85,
+            "rationale": "intentionality: 実行時にエラーが起きない ≠ GET /orders/777: 5xx on missing order (500)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "VF-002",
+      "fingerprint": "decision-violation:payment",
+      "conceptId": "concept:payment",
+      "discrepancy": {
+        "category": "decision-violation",
+        "severity": "high",
+        "expected": "ADR の制約が守られている",
+        "actual": "Payment ↛ Shipping: settlement must not couple to fulfilment",
+        "evidence": "adr:0010",
+        "location": "Payment"
+      },
+      "verdict": {
+        "classification": "bug",
+        "confidence": 0.9,
+        "confirmedCount": 3,
+        "panelSize": 3,
+        "votes": [
+          {
+            "lens": "correctness",
+            "refuted": false,
+            "classification": "bug",
+            "confidence": 0.9,
+            "rationale": "correctness: ADR の制約が守られている ≠ Payment ↛ Shipping: settlement must not couple to fulfilment"
+          },
+          {
+            "lens": "security",
+            "refuted": false,
+            "classification": "bug",
+            "confidence": 0.9,
+            "rationale": "security: ADR の制約が守られている ≠ Payment ↛ Shipping: settlement must not couple to fulfilment"
+          },
+          {
+            "lens": "intentionality",
+            "refuted": false,
+            "classification": "bug",
+            "confidence": 0.9,
+            "rationale": "intentionality: ADR の制約が守られている ≠ Payment ↛ Shipping: settlement must not couple to fulfilment"
+          }
+        ]
+      }
+    },
+    {
+      "id": "VF-003",
+      "fingerprint": "unbuilt-intent:refund",
+      "conceptId": "concept:refund",
+      "discrepancy": {
+        "category": "unbuilt-intent",
+        "severity": "low",
+        "expected": "設計が実装されている",
+        "actual": "intent に在るが structure/behavior 無し",
+        "evidence": "Refund",
+        "location": "Refund"
+      },
+      "verdict": {
+        "classification": "uncertain",
+        "confidence": 0.4,
+        "confirmedCount": 1,
+        "panelSize": 3,
+        "votes": [
+          {
+            "lens": "correctness",
+            "refuted": false,
+            "classification": "uncertain",
+            "confidence": 0.4,
+            "rationale": "correctness: 設計が実装されている ≠ intent に在るが structure/behavior 無し"
+          },
+          {
+            "lens": "security",
+            "refuted": true,
+            "classification": "unnecessary",
+            "confidence": 0.4,
+            "rationale": "security: not clearly a defect — likely accepted"
+          },
+          {
+            "lens": "intentionality",
+            "refuted": true,
+            "classification": "unnecessary",
+            "confidence": 0.4,
+            "rationale": "intentionality: not clearly a defect — likely accepted"
+          }
+        ]
+      }
+    },
+    {
+      "id": "VF-004",
+      "fingerprint": "undocumented-runtime:get-/health",
+      "conceptId": "concept:route/GET /health",
+      "discrepancy": {
+        "category": "undocumented-runtime",
+        "severity": "medium",
+        "expected": "実行時の振る舞いが設計に対応する",
+        "actual": "behavior に在るが structure/intent に無い",
+        "evidence": "GET /health",
+        "location": "GET /health"
+      },
+      "verdict": {
+        "classification": "uncertain",
+        "confidence": 0.5,
+        "confirmedCount": 1,
+        "panelSize": 3,
+        "votes": [
+          {
+            "lens": "correctness",
+            "refuted": false,
+            "classification": "uncertain",
+            "confidence": 0.5,
+            "rationale": "correctness: 実行時の振る舞いが設計に対応する ≠ behavior に在るが structure/intent に無い"
+          },
+          {
+            "lens": "security",
+            "refuted": true,
+            "classification": "unnecessary",
+            "confidence": 0.5,
+            "rationale": "security: not clearly a defect — likely accepted"
+          },
+          {
+            "lens": "intentionality",
+            "refuted": true,
+            "classification": "unnecessary",
+            "confidence": 0.5,
+            "rationale": "intentionality: not clearly a defect — likely accepted"
+          }
+        ]
+      }
+    },
+    {
+      "id": "VF-005",
+      "fingerprint": "unverified-build:post-/admin/reindex",
+      "conceptId": "concept:route/POST /admin/reindex",
+      "discrepancy": {
+        "category": "unverified-build",
+        "severity": "medium",
+        "expected": "実装が実行時に観測される",
+        "actual": "structure に在るが behavior 未観測",
+        "evidence": "POST /admin/reindex",
+        "location": "POST /admin/reindex"
+      },
+      "verdict": {
+        "classification": "uncertain",
+        "confidence": 0.5,
+        "confirmedCount": 1,
+        "panelSize": 3,
+        "votes": [
+          {
+            "lens": "correctness",
+            "refuted": false,
+            "classification": "uncertain",
+            "confidence": 0.5,
+            "rationale": "correctness: 実装が実行時に観測される ≠ structure に在るが behavior 未観測"
+          },
+          {
+            "lens": "security",
+            "refuted": true,
+            "classification": "unnecessary",
+            "confidence": 0.5,
+            "rationale": "security: not clearly a defect — likely accepted"
+          },
+          {
+            "lens": "intentionality",
+            "refuted": true,
+            "classification": "unnecessary",
+            "confidence": 0.5,
+            "rationale": "intentionality: not clearly a defect — likely accepted"
+          }
+        ]
+      }
+    },
+    {
+      "id": "VF-006",
+      "fingerprint": "unverified-build:ab_tests",
+      "conceptId": "concept:struct/ab_tests",
+      "discrepancy": {
+        "category": "unverified-build",
+        "severity": "medium",
+        "expected": "実装が実行時に観測される",
+        "actual": "structure に在るが behavior 未観測",
+        "evidence": "ab_tests",
+        "location": "ab_tests"
+      },
+      "verdict": {
+        "classification": "uncertain",
+        "confidence": 0.5,
+        "confirmedCount": 1,
+        "panelSize": 3,
+        "votes": [
+          {
+            "lens": "correctness",
+            "refuted": false,
+            "classification": "uncertain",
+            "confidence": 0.5,
+            "rationale": "correctness: 実装が実行時に観測される ≠ structure に在るが behavior 未観測"
+          },
+          {
+            "lens": "security",
+            "refuted": true,
+            "classification": "unnecessary",
+            "confidence": 0.5,
+            "rationale": "security: not clearly a defect — likely accepted"
+          },
+          {
+            "lens": "intentionality",
+            "refuted": true,
+            "classification": "unnecessary",
+            "confidence": 0.5,
+            "rationale": "intentionality: not clearly a defect — likely accepted"
+          }
+        ]
+      }
+    },
+    {
+      "id": "VF-007",
+      "fingerprint": "undocumented-runtime:clients",
+      "conceptId": "concept:struct/clients",
+      "discrepancy": {
+        "category": "undocumented-runtime",
+        "severity": "medium",
+        "expected": "実行時の振る舞いが設計に対応する",
+        "actual": "behavior に在るが structure/intent に無い",
+        "evidence": "clients",
+        "location": "clients"
+      },
+      "verdict": {
+        "classification": "uncertain",
+        "confidence": 0.5,
+        "confirmedCount": 1,
+        "panelSize": 3,
+        "votes": [
+          {
+            "lens": "correctness",
+            "refuted": false,
+            "classification": "uncertain",
+            "confidence": 0.5,
+            "rationale": "correctness: 実行時の振る舞いが設計に対応する ≠ behavior に在るが structure/intent に無い"
+          },
+          {
+            "lens": "security",
+            "refuted": true,
+            "classification": "unnecessary",
+            "confidence": 0.5,
+            "rationale": "security: not clearly a defect — likely accepted"
+          },
+          {
+            "lens": "intentionality",
+            "refuted": true,
+            "classification": "unnecessary",
+            "confidence": 0.5,
+            "rationale": "intentionality: not clearly a defect — likely accepted"
+          }
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "total": 7,
+    "bug": 2,
+    "uncertain": 5,
+    "unnecessary": 0
+  }
+}

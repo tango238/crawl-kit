@@ -1,0 +1,28 @@
+{
+  "name": "@crawl-kit/freshness",
+  "version": "0.1.0",
+  "description": "Acquisition freshness — cull re-acquisition of structure/behavior by TTL + content-hash change.",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@crawl-kit/contract": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}

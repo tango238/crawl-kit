@@ -1,0 +1,35 @@
+{
+  "generatedAt": "2026-06-28T07:22:57.110Z",
+  "boundaries": 9,
+  "findings": [
+    {
+      "route": "POST /orders",
+      "facet": "persistence",
+      "kind": "persistence-unobserved",
+      "severity": "low",
+      "ok": false,
+      "detail": "C/U 境界だが保存が観測されていない（未検証）"
+    },
+    {
+      "route": "POST /payments",
+      "facet": "persistence",
+      "kind": "persistence-unobserved",
+      "severity": "low",
+      "ok": false,
+      "detail": "C/U 境界だが保存が観測されていない（未検証）"
+    },
+    {
+      "route": "POST /shipments",
+      "facet": "persistence",
+      "kind": "persistence-unobserved",
+      "severity": "low",
+      "ok": false,
+      "detail": "C/U 境界だが保存が観測されていない（未検証）"
+    }
+  ],
+  "summary": {
+    "problems": 3,
+    "high": 0,
+    "ok": 0
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "name": "@crawl-kit/behavior",
+  "version": "0.0.0",
+  "description": "loop-e2e absorbed — owns crawl/scenario/e2e/verify. Emits behavior LayerNodes onto the spine.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "loop-e2e": "dist/cli/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./cli": "./dist/cli/index.js",
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "dev": "tsx src/cli/index.ts",
+    "emit": "tsx src/cli/index.ts emit"
+  },
+  "dependencies": {
+    "@crawl-kit/contract": "workspace:*",
+    "@crawl-kit/reconciler": "workspace:*",
+    "@anthropic-ai/sdk": "^0.105.0",
+    "@clack/prompts": "^1.6.0",
+    "@octokit/rest": "^22.0.1",
+    "commander": "^15.0.0",
+    "dotenv": "^17.4.2",
+    "mysql2": "^3.22.5",
+    "pg": "^8.22.0",
+    "pino": "^10.3.1",
+    "playwright": "^1.61.0",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.20.0",
+    "tsx": "^4.19.2"
+  },
+  "private": true
+}

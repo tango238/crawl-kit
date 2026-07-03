@@ -1,0 +1,10 @@
+[
+  {"nodeId":"behavior:route/GET /orders","layer":"behavior","localName":"GET /orders","raw":{"findings":[{"method":"GET","url":"/orders","status":200,"severity":"info"}]},"route":"GET /orders","source":{"tool":"loop-e2e"}},
+  {"nodeId":"behavior:route/GET /orders/777","layer":"behavior","localName":"GET /orders/777","raw":{"findings":[{"method":"GET","url":"/orders/777","status":500,"severity":"error","note":"5xx on missing order"}]},"route":"GET /orders/777","source":{"tool":"loop-e2e"}},
+  {"nodeId":"behavior:route/POST /orders","layer":"behavior","localName":"POST /orders","raw":{"findings":[{"method":"POST","url":"/orders","status":201,"severity":"info"}]},"route":"POST /orders","source":{"tool":"loop-e2e"}},
+  {"nodeId":"behavior:route/GET /customers","layer":"behavior","localName":"GET /customers","raw":{"findings":[{"method":"GET","url":"/customers","status":200,"severity":"info"}]},"route":"GET /customers","source":{"tool":"loop-e2e"}},
+  {"nodeId":"behavior:route/GET /products","layer":"behavior","localName":"GET /products","raw":{"findings":[{"method":"GET","url":"/products","status":200,"severity":"info"}]},"route":"GET /products","source":{"tool":"loop-e2e"}},
+  {"nodeId":"behavior:route/POST /payments","layer":"behavior","localName":"POST /payments","raw":{"findings":[{"method":"POST","url":"/payments","status":201,"severity":"info"}]},"route":"POST /payments","source":{"tool":"loop-e2e"}},
+  {"nodeId":"behavior:route/POST /shipments","layer":"behavior","localName":"POST /shipments","raw":{"findings":[{"method":"POST","url":"/shipments","status":201,"severity":"info"}]},"route":"POST /shipments","source":{"tool":"loop-e2e"}},
+  {"nodeId":"behavior:route/GET /health","layer":"behavior","localName":"GET /health","raw":{"findings":[{"method":"GET","url":"/health","status":200,"severity":"info"}]},"route":"GET /health","source":{"tool":"loop-e2e"}}
+]

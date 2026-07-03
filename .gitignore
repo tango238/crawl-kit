@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+
+# derived artifact — rebuildable from registry + emits
+data/unified.json
+.gstack/
+.claude/
+
+# incremental analyzer fragment cache
+.crawl-kit-cache/

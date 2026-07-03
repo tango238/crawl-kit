@@ -1,0 +1,73 @@
+erDiagram
+  orders {
+    string id
+    string customer_id
+    string total
+    string status
+    string placed_at
+  }
+  customers {
+    string id
+    string name
+    string email
+  }
+  products {
+    string id
+    string name
+    string price
+    string sku
+  }
+  payments {
+    string id
+    string order_id
+    string amount
+    string method
+  }
+  shipments {
+    string id
+    string order_id
+    string address
+    string carrier
+  }
+  order_items {
+    string id
+    string order_id
+    string product_id
+    string qty
+  }
+  accounts {
+    string id
+    string customer_id
+    string tier
+    string active_since
+  }
+  clients {
+    string id
+    string name
+    string phone
+  }
+  sessions {
+    string id
+    string user_id
+    string token
+    string expires_at
+  }
+  outbox {
+    string id
+    string event_type
+    string payload
+    string published_at
+  }
+  ab_tests {
+    string id
+    string experiment
+    string variant
+    string bucket
+  }
+  orders ||--o{ customers : "depends-on"
+  payments ||--o{ orders : "depends-on"
+  payments ||--o{ shipments : "depends-on"
+  shipments ||--o{ orders : "depends-on"
+  order_items ||--o{ orders : "depends-on"
+  order_items ||--o{ products : "depends-on"
+  accounts ||--o{ customers : "depends-on"

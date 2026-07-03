@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>crawl-kit — viewer</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<!--
+  SPA shell (P5 Task 3). app.js is a hash router: it dynamic-imports
+  views/<name>.js per route and renders into #view. Each view module exports
+  an async render(el) and fetches its own data from /api/*.json.
+-->
+<div id="app">
+  <aside id="sidebar">
+    <div class="sb-header"><h1>crawl-kit</h1></div>
+    <ul class="sb-nav" id="nav-list">
+      <li><a href="#/" data-route="/">ダッシュボード</a></li>
+
+      <li class="sb-group-header">intent</li>
+      <li><a href="#/intent/events" data-route="/intent/events">イベント</a></li>
+      <li><a href="#/intent/aggregates" data-route="/intent/aggregates">集約</a></li>
+      <li><a href="#/intent/transitions" data-route="/intent/transitions">状態遷移</a></li>
+
+      <li class="sb-group-header">structure</li>
+      <li><a href="#/structure/routes" data-route="/structure/routes">ルーティング</a></li>
+      <li><a href="#/structure/usecases" data-route="/structure/usecases">ユースケース</a></li>
+      <li><a href="#/structure/entities" data-route="/structure/entities">エンティティ</a></li>
+      <li><a href="#/structure/er" data-route="/structure/er">ER図</a></li>
+      <li><a href="#/structure/uc-entity" data-route="/structure/uc-entity">エンティティ×UC</a></li>
+
+      <li class="sb-group-header">behavior</li>
+      <li><a href="#/behavior/traffic" data-route="/behavior/traffic">通信ログ</a></li>
+      <li><a href="#/behavior/sitemap" data-route="/behavior/sitemap">画面遷移</a></li>
+
+      <li class="sb-group-header">観測マップ</li>
+      <li><a href="#/map/events" data-route="/map/events">イベント</a></li>
+      <li><a href="#/map/transitions" data-route="/map/transitions">状態遷移</a></li>
+      <li><a href="#/map/boundary" data-route="/map/boundary">システム境界</a></li>
+    </ul>
+  </aside>
+  <main id="view"></main>
+</div>
+<script type="module" src="/app.js"></script>
+</body>
+</html>

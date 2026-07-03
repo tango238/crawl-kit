@@ -1,0 +1,33 @@
+{
+  "name": "@crawl-kit/intent",
+  "version": "0.1.0",
+  "description": "Intent layer — supplies the glossary as canonical concepts. The id issuer.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "fixtures"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "emit": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@crawl-kit/contract": "workspace:*",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  },
+  "private": true
+}

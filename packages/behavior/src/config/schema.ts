@@ -1,0 +1,188 @@
+import { z } from 'zod'
+
+export const RepositorySchema = z.object({
+  name: z.string(),
+  label: z.string(),
+  url: z.string().url(),
+  role: z.enum(['frontend', 'backend']),
+  audience: z.enum(['user', 'admin']),
+  branch: z.string().optional(),
+})
+
+// 2FA configuration lives on the login scenario (scenario.twoFactor), not on the target —
+// environment-specific glue (e.g. reading a PIN from mailpit) belongs with the scenario's scripts.
+export const AuthSchema = z.object({
+  strategy: z.enum(['form', 'basic', 'none']),
+  /** Path to the login form, resolved against the target baseUrl (same-domain logins). */
+  loginPath: z.string().optional(),
+  /** Absolute URL of the login form. Use when the login form lives on a DIFFERENT domain
+   *  than the app under test (e.g. an admin/SSO portal). Takes precedence over loginPath. */
+  loginUrl: z.string().url().optional(),
+  usernameEnv: z.string().optional(),
+  passwordEnv: z.string().optional(),
+})
+
+export const TargetSchema = z.object({
+  name: z.string(),
+  baseUrl: z.string().url(),
+  auth: AuthSchema.optional(),
+})
+
+export const DbSchema = z.object({
+  name: z.string(),
+  type: z.enum(['postgres', 'mysql']),
+  host: z.string(),
+  port: z.number().int().positive(),
+  database: z.string(),
+  user: z.string(),
+  passwordEnv: z.string(),
+})
+
+const ModelsSchema = z.object({
+  planning: z.string().default('claude-opus-4-8'),
+  report: z.string().default('claude-sonnet-4-6'),
+  verification: z.string().default('claude-opus-4-8'),
+}).default({ planning: 'claude-opus-4-8', report: 'claude-sonnet-4-6', verification: 'claude-opus-4-8' })
+
+const IngestionSchema = z.object({
+  cloneDepth: z.number().int().min(1).default(50),
+  tokenBudgetPerRepo: z.number().int().min(1000).default(120000),
+  gitLogCount: z.number().int().min(1).default(50),
+}).default({ cloneDepth: 50, tokenBudgetPerRepo: 120000, gitLogCount: 50 })
+
+const RefutationSchema = z.object({
+  panelSize: z.number().int().min(1).default(3),
+  confidenceThreshold: z.number().min(0).max(1).default(0.8),
+  lenses: z.array(z.enum(['correctness', 'security', 'intentionality']))
+    .default(['correctness', 'security', 'intentionality']),
+}).default({ panelSize: 3, confidenceThreshold: 0.8, lenses: ['correctness', 'security', 'intentionality'] })
+
+const LaunchSchema = z.object({
+  compose: z.object({
+    files: z.array(z.string().min(1)).min(1),
+    projectName: z.string().min(1),
+    envFile: z.string().optional(),
+  }),
+  readiness: z.object({
+    url: z.string().url(),
+    timeoutSec: z.number().int().positive().default(180),
+    intervalSec: z.number().int().positive().default(3),
+  }),
+  seed: z.object({ command: z.string().min(1) }).optional(),
+  targetName: z.string().min(1),
+})
+
+export type Launch = z.infer<typeof LaunchSchema>
+
+const GrowSchema = z.object({
+  maxPages: z.number().int().positive().default(50),
+  maxDepth: z.number().int().positive().default(3),
+  excludePaths: z.array(z.string()).default([]),
+})
+
+/**
+ * BFS discovery reach for the `collect`/`run` crawl (distinct from `grow`, which drives scenario
+ * proposal). Lets `run` reach beyond base + scenario targets by following same-origin links, so the
+ * viewer's observation map isn't limited to 2 pages. Defaults are intentionally modest.
+ */
+const CrawlSchema = z.object({
+  maxPages: z.number().int().positive().default(10),
+  maxDepth: z.number().int().positive().default(3),
+  excludePaths: z.array(z.string()).default([]),
+})
+
+/** Fallback used when the config omits a `crawl` section entirely (so discovery still runs). */
+export const DEFAULT_CRAWL = { maxPages: 10, maxDepth: 3, excludePaths: [] as string[] }
+
+/** Exploratory input verification integrated into `run` (run --explore). */
+const ExploreSchema = z.object({
+  /** Default screen paths to explore when `run --explore` is given no --screen flags. */
+  screens: z.array(z.string().min(1)).default([]),
+})
+
+export const ConfigSchema = z.object({
+  repositories: z.array(RepositorySchema).min(1),
+  targets: z.array(TargetSchema).min(1),
+  databases: z.array(DbSchema),
+  schedule: z.object({ intervalMinutes: z.number().int().min(1) }),
+  scenarioDir: z.string().min(1),
+  /** Language for AI-generated human-readable text (scenarios, report prose, finding details/rationale). Defaults to Japanese ('ja') when unset. */
+  language: z.string().min(1).optional(),
+  github: z.object({ labels: z.object({ ready: z.string(), autoDetect: z.string() }) }),
+  baseline: z.object({ commit: z.boolean().default(false) }).default({ commit: false }),
+  models: ModelsSchema,
+  ingestion: IngestionSchema,
+  refutation: RefutationSchema,
+  launch: LaunchSchema.optional(),
+  setup: z.array(z.object({ command: z.string().min(1) })).optional(),
+  grow: GrowSchema.optional(),
+  crawl: CrawlSchema.optional(),
+  explore: ExploreSchema.optional(),
+})
+
+export type Config = z.infer<typeof ConfigSchema>
+export type DbConfig = z.infer<typeof DbSchema>
+export type Grow = z.infer<typeof GrowSchema>
+export type Crawl = z.infer<typeof CrawlSchema>
+export type Explore = z.infer<typeof ExploreSchema>
+export const CONFIG_FILENAME = 'e2e.config.yaml'
+
+// ── workspace mode ───────────────────────────────────────────────────────────
+// The workspace config (.crawl-kit/workspace.yaml) is ConfigSchema evolved for
+// multi-repo workspaces created by `crawl-kit setup`: repos get a local clone
+// path, cross-phase knobs (maxParallel, regenerateTtlSeconds) live here, and
+// fields a fresh workspace can't know yet (targets, github) become optional.
+
+export const WorkspaceRepositorySchema = RepositorySchema.extend({
+  /** Clone destination relative to the workspace root. Defaults to `name`. */
+  path: z.string().optional(),
+})
+
+export const WorkspaceConfigSchema = ConfigSchema.extend({
+  repositories: z.array(WorkspaceRepositorySchema).min(1),
+  targets: z.array(TargetSchema).default([]),
+  databases: z.array(DbSchema).default([]),
+  schedule: z.object({ intervalMinutes: z.number().int().min(1) }).default({ intervalMinutes: 60 }),
+  scenarioDir: z.string().min(1).default('scenarios'),
+  github: z.object({ labels: z.object({ ready: z.string(), autoDetect: z.string() }) }).optional(),
+  /** Shared parallelism cap for every phase (structure fan-out, crawl, LLM calls). */
+  maxParallel: z.number().int().min(1).default(3),
+  /** Regeneration TTL: artifacts younger than this are reused. */
+  regenerateTtlSeconds: z.number().int().min(1).default(86400),
+})
+
+export type WorkspaceConfig = z.infer<typeof WorkspaceConfigSchema>
+export type WorkspaceRepository = z.infer<typeof WorkspaceRepositorySchema>
+
+/** Shape of .crawl-kit/repos/<name>.yaml — per-repo analysis settings written by `setup`. */
+export const RepoSetupSchema = z.object({
+  framework: z.string(),
+  structure: z.object({
+    summary: z.string(),
+    routingDirs: z.array(z.string()).default([]),
+    controllerDirs: z.array(z.string()).default([]),
+    modelDirs: z.array(z.string()).default([]),
+  }),
+  devServer: z
+    .object({
+      command: z.string(),
+      port: z.number().int().optional(),
+      composeFile: z.string().optional(),
+    })
+    .optional(),
+  dbAccess: z
+    .object({
+      /** Where connection info comes from: ".env", "config/database.php", ... */
+      source: z.string(),
+      envFile: z.string().optional(),
+    })
+    .optional(),
+  claudeMd: z.object({
+    present: z.boolean(),
+    source: z.enum(['claude-md', 'auto-analysis', 'user']),
+  }),
+})
+
+export type RepoSetup = z.infer<typeof RepoSetupSchema>
+
+export const WORKSPACE_CONFIG_RELPATH = '.crawl-kit/workspace.yaml'

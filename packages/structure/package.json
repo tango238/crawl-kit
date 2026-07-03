@@ -1,0 +1,37 @@
+{
+  "name": "@crawl-kit/structure",
+  "version": "0.1.0",
+  "description": "rdra port — static extraction only. Emits route-keyed structure LayerNodes.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "fixtures",
+    "knowledge"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "emit": "tsx src/cli.ts",
+    "analyze": "tsx src/analyze-cli.ts",
+    "correct": "tsx src/correct-cli.ts"
+  },
+  "dependencies": {
+    "@crawl-kit/contract": "workspace:*",
+    "@crawl-kit/freshness": "workspace:*",
+    "@crawl-kit/reconciler": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  },
+  "private": true
+}

@@ -1,0 +1,31 @@
+[
+  {
+    "adrId": "adr:0009",
+    "title": "Split Customer into Customer + Account",
+    "status": "accepted",
+    "date": "2026-03-01",
+    "affects": ["concept:customer"],
+    "constraints": [
+      {
+        "kind": "note",
+        "from": "concept:customer",
+        "text": "the `accounts` table is the Account side of the Customer split; the glossary has not been updated yet, so this divergence is adjudicated, not a defect"
+      }
+    ]
+  },
+  {
+    "adrId": "adr:0010",
+    "title": "Payment must not depend on Shipping",
+    "status": "accepted",
+    "date": "2026-04-15",
+    "affects": ["concept:payment", "concept:shipment"],
+    "constraints": [
+      {
+        "kind": "forbid-dependency",
+        "from": "concept:payment",
+        "to": "concept:shipment",
+        "text": "Payment ↛ Shipping: settlement must not couple to fulfilment"
+      }
+    ]
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "title": "crawl-kit ドメインモデル",
+  "order": ["discovery", "event-storming", "bounded-contexts", "context-map", "aggregates", "domain-events", "sync"],
+  "labels": {
+    "discovery": "ディスカバリ",
+    "event-storming": "イベントストーミング",
+    "bounded-contexts": "境界づけられたコンテキスト",
+    "context-map": "コンテキストマップ",
+    "aggregates": "集約",
+    "domain-events": "ドメインイベント",
+    "sync": "モデル⇔実装 Sync"
+  }
+}

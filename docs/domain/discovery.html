@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Discovery</title><style>:root{--bg:#0f172a;--card:#1e293b;--line:#334155;--txt:#e2e8f0;--muted:#94a3b8;--accent:#7dd3fc}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,'Hiragino Kaku Gothic ProN','Segoe UI',sans-serif;line-height:1.75}
+nav.top{position:sticky;top:0;z-index:10;background:#0b1220;border-bottom:1px solid var(--line);padding:10px 24px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+nav.top .brand{font-weight:700;font-size:14px;margin-right:12px;color:#fff}
+nav.top a{color:var(--muted);text-decoration:none;font-size:13px;padding:5px 11px;border-radius:7px;white-space:nowrap}
+nav.top a:hover{background:#172033;color:var(--txt)}
+nav.top a.active{background:#334155;color:#fff;font-weight:600}
+main{max-width:1000px;margin:0 auto;padding:32px 28px 96px}
+main img{max-width:100%;height:auto;border-radius:12px;border:1px solid var(--line);display:block;margin:18px auto}
+h1{font-size:26px;border-bottom:2px solid var(--line);padding-bottom:12px;margin-top:8px}
+h2{font-size:20px;border-bottom:1px solid var(--line);padding-bottom:7px;margin-top:38px}
+h3{font-size:16px;margin-top:28px;color:#cbd5e1}h4{font-size:14px;margin-top:20px;color:#cbd5e1}
+a{color:var(--accent)}p,li{font-size:14.5px}
+code{background:#0b1220;padding:2px 7px;border-radius:5px;font-size:13px;font-family:ui-monospace,Menlo,monospace}
+pre{background:#0b1220;border:1px solid var(--line);border-radius:10px;padding:16px;overflow:auto;font-size:12.5px;line-height:1.55}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;width:100%;margin:16px 0;font-size:13px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--card);font-weight:600}tr:nth-child(even) td{background:#172033}
+blockquote{border-left:4px solid #475569;margin:16px 0;padding:4px 18px;color:var(--muted);background:#131c2e;border-radius:0 8px 8px 0}
+hr{border:none;border-top:1px solid var(--line);margin:32px 0}
+ul,ol{padding-left:24px}li{margin:4px 0}strong{color:#f1f5f9}
+footer{max-width:1000px;margin:0 auto;padding:20px 28px 60px;color:var(--muted);font-size:12px;border-top:1px solid var(--line)}
+
+figure.jig-graph{margin:18px 0;background:#0b1220;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+figure.jig-graph .jig-toolbar{display:flex;gap:6px;justify-content:flex-end;padding:8px 10px;border-bottom:1px solid var(--line);background:#0d1526}
+figure.jig-graph .jig-toolbar button{background:#172033;color:var(--muted);border:1px solid var(--line);border-radius:6px;font-size:12px;padding:3px 9px;cursor:pointer}
+figure.jig-graph .jig-toolbar button:hover{background:#1e293b;color:var(--txt)}
+figure.jig-graph .jig-canvas{padding:16px;overflow:auto;text-align:center}
+figure.jig-graph .jig-canvas svg{max-width:100%;height:auto}
+figure.jig-graph .jig-fallback{background:none;border:none;text-align:left;color:var(--muted);margin:0}
+</style></head><body>
+<nav class="top"><span class="brand">crawl-kit ドメインモデル</span><a href="discovery.html" class="active">ディスカバリ</a><a href="event-storming.html">イベントストーミング</a><a href="bounded-contexts.html">境界づけられたコンテキスト</a><a href="context-map.html">コンテキストマップ</a><a href="aggregates.html">集約</a><a href="domain-events.html">ドメインイベント</a><a href="sync.html">モデル⇔実装 Sync</a></nav>
+<main>
+<h1 id="discovery">Discovery</h1>
+<h2 id="">ビジネス概要</h2>
+<p>crawl-kit は表面上「意図した／作った／動いているソフトウェアのずれ」を扱うが、<strong>本質は検証</strong>である。 intent（こう作りたい）と structure（こう作った＝コード）が決まれば、behavior（こう動く）は<strong>自ずと決まる</strong>。 よって crawl-kit の元々の用途は、<strong>設計（intent＋structure）から決まるはずの挙動を、実際に走らせて 「想定通り動くか」を確かめる検証</strong>にある（loop-e2e: AI 駆動クロール＋検証ループの出自）。 挙動は第三の対等な意見ではなく、設計を裏取りする<strong>結果（オラクル）</strong>。</p>
+<h2 id="">非対称モデル（重要な気づき）</h2>
+<p>三層は対等な三角形ではない。「差分」という語は誤りで、<strong>観点の違う三つのレンズを一箇所に集めること自体は差分ではない</strong>。 正しくは非対称:</p>
+<ul><li><strong>intent / structure = 宣言（設計）</strong>。「決める」もの。両者の比較だけが本来の <strong>差分（intent↔structure）</strong>。</li><li><strong>behavior = 結果</strong>。設計から決まる。その役割は <strong>検証（合否）</strong>。</li></ul>
+<p>→ 「三辺の差分」ではなく <strong>「1本の差分（intent↔structure）＋ それを実地で検証する behavior」</strong> に畳まれる。 behavior は名寄せ・登録の対等な対象ではなく、<strong>静的な『こう動くはず』を実行時の事実で裏取りし、 嘘（バグ・未実装・想定外）を捕まえる検証器</strong>。</p>
+<h2 id="core-domain">Core Domain</h2>
+<ul><li><strong>名前</strong>: 検証（Verification）— 挙動コンフォーマンス</li><li><strong>理由</strong>: 元々の用途であり、設計から決まる*はず*の挙動を実行して裏取りする部分が、</li></ul>
+<p>人手でも既製品でも代替しにくい競争優位。コード上の中心は <strong>packages/behavior</strong>（クロール＋検証）。</p>
+<ul><li><strong>差別化要因</strong>: 静的解析の「こう動くはず」を、実行時の事実で裏取りする。設計と現実の食い違いを実地で炙り出す。</li></ul>
+<h3 id="d-intent-structure">なぜ D（intent↔structure の差分）はコアでないか</h3>
+<p>intent は <strong>distill-ddd（外部ツール）が供給</strong>し、crawl-kit は intent を所有しない。 intent↔structure の差分はその外部供給に依存するため、crawl-kit のコアにはなり得ない。 （distill-ddd が接続されれば「intent↔behavior 検証」という上位の検証に広がるが、それは拡張であって前提ではない。）</p>
+<h2 id="supporting-subdomains">Supporting Subdomains</h2>
+<ul><li><strong>structure 抽出（rdra-analyzer 由来 / packages/structure）</strong>: 検証が照合する<strong>期待（仕様）</strong>を供給する。</li><li><strong>正準レジストリ・名寄せ（packages/reconciler の一部）</strong>: 期待（structure）と挙動（behavior）を</li></ul>
+<p>「同じモノ」として突き合わせる土台。これが無いと「集めただけ」で検証にならない。</p>
+<ul><li><strong>収束ループ（corrections / decisions の焼き込み）</strong>: 期待がコードの進化に追従し続けるための運用。</li></ul>
+<h2 id="generic">Generic / 範囲外</h2>
+<ul><li><strong>intent（distill-ddd）</strong>: 外部ツール。任意の上流供給。crawl-kit は所有しない。</li><li><strong>viewer 描画 / contract の I/O・検証</strong>: 汎用。代替可能。</li></ul>
+<h2 id="swot">SWOT（任意・暫定）</h2>
+<table><thead><tr><th>Strengths</th><th>Weaknesses</th></tr></thead><tbody><tr><td>実行時検証の出自（loop-e2e）。三層を同じ ID で束ねる正準レジストリ</td><td>Core（検証）より周辺（reconciler intent 辺）を作り込んでしまった重心ズレ</td></tr></tbody></table>
+<table><thead><tr><th>Opportunities</th><th>Threats</th></tr></thead><tbody><tr><td>distill-ddd 接続で intent↔behavior 検証へ拡張。CI で PR ごとに検証</td><td>intent を外部依存にしたままだと「設計整合の差分」は弱いまま</td></tr></tbody></table>
+<h2 id="">未解決の問い</h2>
+<ul><li>既に作った reconciler の <strong>intent 辺（8状態分類・ADR オーバーレイ）は、検証コアに対して Supporting か、範囲外か</strong>。</li></ul>
+<p>検証中心に据え直すと、何が中心で何が周辺に動くか（重心の再配置）。</p>
+<ul><li>検証が照合する<strong>「期待」は structure だけで十分か</strong>。intent が無いと弱くなるのはどの種類の検証か。</li><li>「検証」の単位は何か（ルート？シナリオ？ユースケース？）。次フェーズ（storming）の出発点。</li></ul>
+</main>
+<footer>crawl-kit ドメインモデル &nbsp;|&nbsp; source: <code>docs/domain/discovery.md</code> &nbsp;|&nbsp; generated by /ddd publish</footer>
+
+</body></html>

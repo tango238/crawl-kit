@@ -1,0 +1,9 @@
+flowchart LR
+  ListOrders["ListOrders"] -->|R| orders
+  GetOrder["GetOrder"] -->|R| orders
+  CreateOrder["CreateOrder"] -->|C| orders
+  ListCustomers["ListCustomers"] -->|R| customers
+  ListProducts["ListProducts"] -->|R| products
+  GetProduct["GetProduct"] -->|R| products
+  CreatePayment["CreatePayment"] -->|C| payments
+  CreateShipment["CreateShipment"] -->|C| shipments

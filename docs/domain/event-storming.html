@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Event Storming</title><style>:root{--bg:#0f172a;--card:#1e293b;--line:#334155;--txt:#e2e8f0;--muted:#94a3b8;--accent:#7dd3fc}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,'Hiragino Kaku Gothic ProN','Segoe UI',sans-serif;line-height:1.75}
+nav.top{position:sticky;top:0;z-index:10;background:#0b1220;border-bottom:1px solid var(--line);padding:10px 24px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+nav.top .brand{font-weight:700;font-size:14px;margin-right:12px;color:#fff}
+nav.top a{color:var(--muted);text-decoration:none;font-size:13px;padding:5px 11px;border-radius:7px;white-space:nowrap}
+nav.top a:hover{background:#172033;color:var(--txt)}
+nav.top a.active{background:#334155;color:#fff;font-weight:600}
+main{max-width:1000px;margin:0 auto;padding:32px 28px 96px}
+main img{max-width:100%;height:auto;border-radius:12px;border:1px solid var(--line);display:block;margin:18px auto}
+h1{font-size:26px;border-bottom:2px solid var(--line);padding-bottom:12px;margin-top:8px}
+h2{font-size:20px;border-bottom:1px solid var(--line);padding-bottom:7px;margin-top:38px}
+h3{font-size:16px;margin-top:28px;color:#cbd5e1}h4{font-size:14px;margin-top:20px;color:#cbd5e1}
+a{color:var(--accent)}p,li{font-size:14.5px}
+code{background:#0b1220;padding:2px 7px;border-radius:5px;font-size:13px;font-family:ui-monospace,Menlo,monospace}
+pre{background:#0b1220;border:1px solid var(--line);border-radius:10px;padding:16px;overflow:auto;font-size:12.5px;line-height:1.55}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;width:100%;margin:16px 0;font-size:13px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--card);font-weight:600}tr:nth-child(even) td{background:#172033}
+blockquote{border-left:4px solid #475569;margin:16px 0;padding:4px 18px;color:var(--muted);background:#131c2e;border-radius:0 8px 8px 0}
+hr{border:none;border-top:1px solid var(--line);margin:32px 0}
+ul,ol{padding-left:24px}li{margin:4px 0}strong{color:#f1f5f9}
+footer{max-width:1000px;margin:0 auto;padding:20px 28px 60px;color:var(--muted);font-size:12px;border-top:1px solid var(--line)}
+
+figure.jig-graph{margin:18px 0;background:#0b1220;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+figure.jig-graph .jig-toolbar{display:flex;gap:6px;justify-content:flex-end;padding:8px 10px;border-bottom:1px solid var(--line);background:#0d1526}
+figure.jig-graph .jig-toolbar button{background:#172033;color:var(--muted);border:1px solid var(--line);border-radius:6px;font-size:12px;padding:3px 9px;cursor:pointer}
+figure.jig-graph .jig-toolbar button:hover{background:#1e293b;color:var(--txt)}
+figure.jig-graph .jig-canvas{padding:16px;overflow:auto;text-align:center}
+figure.jig-graph .jig-canvas svg{max-width:100%;height:auto}
+figure.jig-graph .jig-fallback{background:none;border:none;text-align:left;color:var(--muted);margin:0}
+</style></head><body>
+<nav class="top"><span class="brand">crawl-kit ドメインモデル</span><a href="discovery.html">ディスカバリ</a><a href="event-storming.html" class="active">イベントストーミング</a><a href="bounded-contexts.html">境界づけられたコンテキスト</a><a href="context-map.html">コンテキストマップ</a><a href="aggregates.html">集約</a><a href="domain-events.html">ドメインイベント</a><a href="sync.html">モデル⇔実装 Sync</a></nav>
+<main>
+<h1 id="event-storming">Event Storming</h1>
+<blockquote>Core Domain = <strong>検証（Verification）</strong>（<a href="./discovery.html">discovery.md</a>）。<br>本モデルは <strong>移植済みの loop-e2e 実装（packages/behavior）から抽出</strong>した（<code>--analyze</code>）。<br>イベントは「検証ループ」の時系列。</blockquote>
+<h2 id="">イベントフロー（コンテキスト間）</h2>
+<figure class="jig-graph" data-kind="event-flow">
+  <div class="jig-toolbar"><button type="button" data-act="dir" title="Switch direction">⇄</button><button type="button" data-act="svg" title="Download SVG">⬇ SVG</button><button type="button" data-act="src" title="Copy DOT source">⧉ DOT</button></div>
+  <script type="text/vnd.graphviz">digraph "event_flow" {
+  rankdir="LR";
+  bgcolor="transparent";
+  node [shape=box, style=filled, fontname="sans-serif", fontsize=12, fillcolor="#1e293b", color="#94a3b8", fontcolor="#e2e8f0", margin="0.18,0.10"];
+  edge [fontname="sans-serif", fontsize=10, color="#94a3b8", fontcolor="#cbd5e1"];
+  "Observation" [color="#7dd3fc", penwidth="1.6"];
+  "Reconciliation" [color="#7dd3fc", penwidth="1.6"];
+  "Verification" [color="#7dd3fc", penwidth="1.6"];
+  "Scenario Lifecycle" [color="#7dd3fc", penwidth="1.6"];
+  "Convergence" [color="#7dd3fc", penwidth="1.6"];
+  "Reporting" [color="#7dd3fc", penwidth="1.6"];
+  "Observation" -> "Reconciliation" [label="BehaviorEmitted", color="#f59e0b", fontcolor="#fde68a", penwidth="1.5"];
+  "Reconciliation" -> "Verification" [label="UnifiedGenerated", color="#f59e0b", fontcolor="#fde68a", penwidth="1.5"];
+  "Scenario Lifecycle" -> "Verification" [label="ScenarioApproved", color="#f59e0b", fontcolor="#fde68a", penwidth="1.5"];
+  "Verification" -> "Convergence" [label="FindingProduced", color="#f59e0b", fontcolor="#fde68a", penwidth="1.5"];
+  "Verification" -> "Reporting" [label="VerdictReached", color="#f59e0b", fontcolor="#fde68a", penwidth="1.5"];
+  "Convergence" -> "Verification" [label="KnownStateUpdated", color="#f59e0b", fontcolor="#fde68a", penwidth="1.5"];
+}</script>
+  <div class="jig-canvas"><pre class="jig-fallback">digraph &quot;event_flow&quot; {
+  rankdir=&quot;LR&quot;;
+  bgcolor=&quot;transparent&quot;;
+  node [shape=box, style=filled, fontname=&quot;sans-serif&quot;, fontsize=12, fillcolor=&quot;#1e293b&quot;, color=&quot;#94a3b8&quot;, fontcolor=&quot;#e2e8f0&quot;, margin=&quot;0.18,0.10&quot;];
+  edge [fontname=&quot;sans-serif&quot;, fontsize=10, color=&quot;#94a3b8&quot;, fontcolor=&quot;#cbd5e1&quot;];
+  &quot;Observation&quot; [color=&quot;#7dd3fc&quot;, penwidth=&quot;1.6&quot;];
+  &quot;Reconciliation&quot; [color=&quot;#7dd3fc&quot;, penwidth=&quot;1.6&quot;];
+  &quot;Verification&quot; [color=&quot;#7dd3fc&quot;, penwidth=&quot;1.6&quot;];
+  &quot;Scenario Lifecycle&quot; [color=&quot;#7dd3fc&quot;, penwidth=&quot;1.6&quot;];
+  &quot;Convergence&quot; [color=&quot;#7dd3fc&quot;, penwidth=&quot;1.6&quot;];
+  &quot;Reporting&quot; [color=&quot;#7dd3fc&quot;, penwidth=&quot;1.6&quot;];
+  &quot;Observation&quot; -&gt; &quot;Reconciliation&quot; [label=&quot;BehaviorEmitted&quot;, color=&quot;#f59e0b&quot;, fontcolor=&quot;#fde68a&quot;, penwidth=&quot;1.5&quot;];
+  &quot;Reconciliation&quot; -&gt; &quot;Verification&quot; [label=&quot;UnifiedGenerated&quot;, color=&quot;#f59e0b&quot;, fontcolor=&quot;#fde68a&quot;, penwidth=&quot;1.5&quot;];
+  &quot;Scenario Lifecycle&quot; -&gt; &quot;Verification&quot; [label=&quot;ScenarioApproved&quot;, color=&quot;#f59e0b&quot;, fontcolor=&quot;#fde68a&quot;, penwidth=&quot;1.5&quot;];
+  &quot;Verification&quot; -&gt; &quot;Convergence&quot; [label=&quot;FindingProduced&quot;, color=&quot;#f59e0b&quot;, fontcolor=&quot;#fde68a&quot;, penwidth=&quot;1.5&quot;];
+  &quot;Verification&quot; -&gt; &quot;Reporting&quot; [label=&quot;VerdictReached&quot;, color=&quot;#f59e0b&quot;, fontcolor=&quot;#fde68a&quot;, penwidth=&quot;1.5&quot;];
+  &quot;Convergence&quot; -&gt; &quot;Verification&quot; [label=&quot;KnownStateUpdated&quot;, color=&quot;#f59e0b&quot;, fontcolor=&quot;#fde68a&quot;, penwidth=&quot;1.5&quot;];
+}</pre></div>
+</figure>
+<p>（<a href="./domain-events.html">domain-events.md</a> の Event Flow から自動描画。観測→照合→検証→報告／収束の連鎖。）</p>
+<h2 id="domain-events">Domain Events（時系列）</h2>
+<h3 id="run">検証ループ（run）</h3>
+<ol><li><strong>ProjectInitialized</strong> — 対象を loop-e2e 用に初期化（init）</li><li><strong>AppCrawled</strong> — 対象アプリをクロールしページ収集（collect / Playwright）</li><li><strong>SiteStructureExtracted</strong> — LLM がページを構造化（PageInfo: 表示項目・入力項目・期待・能力）</li><li><strong>BaselineEstablished</strong> — 初回は SiteStructure をベースライン保存</li><li><strong>DiffDetected</strong> — 現状 vs ベースラインの差（DiffFinding: transition/displayItem/inputItem/expectation-gap）</li><li><strong>InputExplored</strong>（任意・explore）— 境界値・不正入力を書き込んで UI 状態を生成</li><li><strong>VerifyFindingProduced</strong> — 6カテゴリ検証で違反検出（layout/security/access-control/conditional/registered-data/error-handling）</li><li><strong>ScenarioExecuted</strong> — 採用シナリオを実行し期待と突き合わせ</li><li><strong>FindingRefuted / FindingConfirmed</strong> — 反証パネル（3レンズ: correctness/security/intentionality）が各 finding を反証</li><li><strong>VerdictReached</strong> — 多数決で分類（bug / unnecessary / uncertain）＋確信度</li><li><strong>ReportGenerated</strong> — pending findings を集約しレポート化（＋GitHub issue）</li><li><strong>BehaviorEmitted</strong> — 検証結果を crawl-kit の背骨へ emit（route-keyed LayerNode）★ rdra-export の置換</li></ol>
+<h3 id="feedback">既知化ループ（feedback / 収束）</h3>
+<ol><li><strong>FeedbackSubmitted</strong> — 人が finding に指摘（誤検知/正しい）</li><li><strong>FeedbackVerified</strong> — LLM が valid/invalid を判定</li><li><strong>KnownStateUpdated</strong> — 判断を known-findings に焼き込み（次回から再浮上しない＝burn-in）</li></ol>
+<h3 id="grow-approve">シナリオ育成ループ（grow / approve）</h3>
+<ol><li><strong>ScenariosProposed</strong> — クロール＋ソース理解から新シナリオ草案（grow）</li><li><strong>ScenariosApproved</strong> — 草案を active に昇格（approve）</li></ol>
+<h2 id="command-event">Command / Event マトリクス</h2>
+<table><thead><tr><th>Actor</th><th>Command</th><th>Aggregate</th><th>→ Event</th><th>備考</th></tr></thead><tbody><tr><td>Dev</td><td>InitProject</td><td>Project/Config</td><td>ProjectInitialized</td><td></td></tr><tr><td>Dev</td><td>RunLoop</td><td><strong>Run</strong></td><td>AppCrawled→DiffDetected→VerifyFindingProduced→ReportGenerated</td><td>検証ループ本体</td></tr><tr><td>System</td><td>Crawl</td><td>Crawl(Page)</td><td>AppCrawled</td><td>Playwright</td></tr><tr><td>LLM</td><td>ExtractStructure</td><td><strong>SiteStructure</strong></td><td>SiteStructureExtracted</td><td></td></tr><tr><td>System</td><td>DetectDiff</td><td>Run</td><td>DiffDetected</td><td>baseline 比較</td></tr><tr><td>Dev</td><td>Explore</td><td>InputExploration</td><td>InputExplored</td><td>run --explore</td></tr><tr><td>System</td><td>Verify ×6</td><td><strong>Finding</strong></td><td>VerifyFindingProduced</td><td>6カテゴリ</td></tr><tr><td>System</td><td>ExecuteScenarios</td><td><strong>Scenario</strong></td><td>ScenarioExecuted</td><td></td></tr><tr><td>LLM(panel)</td><td>Refute</td><td><strong>Verdict</strong></td><td>FindingRefuted / VerdictReached</td><td>反証ゲート（trust）</td></tr><tr><td>System</td><td>GenerateReport</td><td><strong>Report</strong></td><td>ReportGenerated</td><td>集約・GitHub issue</td></tr><tr><td>Dev</td><td>SubmitFeedback</td><td><strong>Feedback</strong></td><td>FeedbackSubmitted / FeedbackVerified</td><td></td></tr><tr><td>System</td><td>UpdateKnownState</td><td><strong>KnownFinding</strong></td><td>KnownStateUpdated</td><td>burn-in</td></tr><tr><td>Dev</td><td>Grow</td><td>Scenario</td><td>ScenariosProposed</td><td></td></tr><tr><td>Dev</td><td>Approve</td><td>Scenario</td><td>ScenariosApproved</td><td></td></tr><tr><td>Dev</td><td>Emit</td><td>BehaviorNode</td><td>BehaviorEmitted</td><td>crawl-kit 背骨へ</td></tr></tbody></table>
+<h2 id="discovery">検証の単位（discovery 未解決の問いへの回答）</h2>
+<p>コードが答えを示している。多層だが<strong>原子的単位は Finding</strong>:</p>
+<ul><li><strong>Finding</strong>（DiffFinding / VerifyFinding）＝ 一つの「想定と現実の食い違い」。<strong>verdict を持つ最小単位</strong>。</li><li><strong>Run</strong> ＝ 検証ループ一回。<strong>Scenario</strong> ＝ 検証ケース。<strong>Report</strong> ＝ Finding 集約。</li><li>→ 「検証の単位は？」は <strong>Finding（verdict 付き）</strong> が核。Scenario/Run はその器。</li></ul>
+<h2 id="">発見された問題点（赤付箋）</h2>
+<ul><li>🔴 <strong>二重の adjudication+burn-in が並存</strong>：loop-e2e は <code>Verdict + RefuterVote + KnownFinding/Feedback</code>、</li></ul>
+<p>crawl-kit reconciler は <code>ConceptState + Evidence + decisions/corrections</code>。<strong>同じ『候補を証拠で裁定し、人の判断を焼き込む』構造が2文脈に重複</strong>。語彙統一 or 共有が要る（contexts フェーズの論点）。</p>
+<ul><li>🔴 <strong>behavior を reconciler が対等レンズとして名寄せ</strong>（discovery divergence #2）。本来 behavior は</li></ul>
+<p>「期待（structure）に対する検証判定」を出すべきで、route 概念として code-only/unmatched 分類するのは誤り。</p>
+<ul><li>🟡 <strong>emit の Finding↔Page 紐付けが暫定</strong>（URL 部分一致）。VerifyFinding に route/page 参照が薄い。</li></ul>
+<h2 id="verification-reconciliation">アーキテクチャ決定：Verification を reconciliation の後段へ（確定方針）</h2>
+<p>Adjudication/Verification は reconciler の同一性裁定とは<strong>別文脈のまま</strong>。ただし <strong>behavior の外に出し、 reconciliation の後段に挟む</strong>。behavior は「観測(crawl)」に縮小する。</p>
+<pre><code>intent ─┐
+structure ─┤→ reconciliation(正準IDで三層結合 → unified) → Verification(独立・後段)
+behavior(観測) ─┘                                              │ 入力: unified + 実行中アプリ
+                                                              ▼ Finding/Verdict</code></pre>
+<p><strong>後段化で開く検証（reconcile 済みの三層関係を「期待」にできる）:</strong></p>
+<ul><li>intent↔behavior 適合（業務が欲しかった通り動くか）— reconcile が intent↔behavior を結んで初めて可能</li><li>violates-decision の実地検証（structure×ADR の計算違反が実行時に顕在化するか）</li><li>intent-only（設計済み未実装）の不在検証</li><li>集約境界(part-of)に沿ったシナリオ構成</li></ul>
+<p>→ loop-e2e の baseline-diff（structure 単体の期待）から、<strong>reconcile 済み三層を期待とする検証</strong>へ射程拡大。</p>
+<p><strong>含意（divergence #6）</strong>: 忠実移植は全機能を behavior に入れたが、本決定は <strong>crawl(観測)＝behavior / verify・explore・scenario・refute・report＝後段 Verification 文脈</strong> への分割を要求。</p>
+<h2 id="bounded-context-contexts">Bounded Context 候補（contexts フェーズへの橋渡し）</h2>
+<ul><li><strong>Crawl &amp; Structure</strong>（collect ＋ LLM 構造化）</li><li><strong>Verification</strong>（diff ＋ verify6 ＋ explore ＋ scenario 実行）← Core</li><li><strong>Adjudication</strong>（反証パネル → Verdict）＝ trust ゲート</li><li><strong>Reporting</strong>（集約 ＋ GitHub issue）</li><li><strong>Convergence / Known-state</strong>（feedback → known-findings の burn-in）</li><li><strong>Scenario Lifecycle</strong>（grow → approve）</li><li><strong>Spine Emit</strong>（crawl-kit 背骨への境界）</li></ul>
+<h2 id="">未解決の問い</h2>
+<ul><li>Adjudication（loop-e2e 反証ゲート）と reconciler の同一性裁定は<strong>統合すべき1文脈か、別文脈か</strong>。</li><li>behavior の検証結果は reconciler に「判定」としてどう渡すか（名寄せでなく verdict として）。</li><li>検証の「期待」の出所：structure だけか、intent（distill-ddd）接続でどの検証が強くなるか。</li></ul>
+</main>
+<footer>crawl-kit ドメインモデル &nbsp;|&nbsp; source: <code>docs/domain/event-storming.md</code> &nbsp;|&nbsp; generated by /ddd publish</footer>
+<script src="./_assets/viz-standalone.js"></script>
+<script>
+(function(){
+  var graphs=document.querySelectorAll('figure.jig-graph');
+  if(!graphs.length) return;
+  // Copy-DOT works without the renderer, so bind it unconditionally (the
+  // documented graceful-degradation path when viz-standalone.js is absent).
+  graphs.forEach(function(g){
+    var node=g.querySelector('script[type="text/vnd.graphviz"]');
+    if(!node) return;
+    var src=node.textContent, b=g.querySelector('[data-act=src]');
+    if(b) b.onclick=function(){ if(navigator.clipboard) navigator.clipboard.writeText(src); };
+  });
+  if(!(window.Viz&&window.Viz.instance)) return;  // no renderer: keep DOT fallback
+  window.Viz.instance().then(function(viz){
+    graphs.forEach(function(g){
+      var node=g.querySelector('script[type="text/vnd.graphviz"]');
+      if(!node) return;
+      var src=node.textContent, dir='LR', canvas=g.querySelector('.jig-canvas');
+      function render(){
+        var dot=src.replace(/rankdir\s*=\s*"?(LR|TB)"?/,'rankdir="'+dir+'"');
+        try{var svg=viz.renderSVGElement(dot);canvas.innerHTML='';canvas.appendChild(svg);}
+        catch(e){/* keep fallback */}
+      }
+      render();
+      var b;
+      if((b=g.querySelector('[data-act=dir]'))) b.onclick=function(){dir=(dir==='LR'?'TB':'LR');render();};
+      if((b=g.querySelector('[data-act=svg]'))) b.onclick=function(){
+        var s=canvas.querySelector('svg'); if(!s) return;
+        var blob=new Blob([s.outerHTML],{type:'image/svg+xml'});
+        var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+        a.download=(g.dataset.kind||'diagram')+'.svg';document.body.appendChild(a);a.click();a.remove();
+      };
+    });
+  });
+})();
+</script>
+</body></html>

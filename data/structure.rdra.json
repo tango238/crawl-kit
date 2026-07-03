@@ -1,0 +1,333 @@
+{
+  "entities": [
+    {
+      "name": "orders",
+      "attributes": [
+        "id",
+        "customer_id",
+        "total",
+        "status",
+        "placed_at"
+      ],
+      "dependsOn": [
+        "customers"
+      ],
+      "dependedOnBy": [
+        "payments",
+        "shipments",
+        "order_items"
+      ],
+      "crud": [
+        "C",
+        "R"
+      ]
+    },
+    {
+      "name": "customers",
+      "attributes": [
+        "id",
+        "name",
+        "email"
+      ],
+      "dependsOn": [],
+      "dependedOnBy": [
+        "orders",
+        "accounts"
+      ],
+      "crud": [
+        "R"
+      ]
+    },
+    {
+      "name": "products",
+      "attributes": [
+        "id",
+        "name",
+        "price",
+        "sku"
+      ],
+      "dependsOn": [],
+      "dependedOnBy": [
+        "order_items"
+      ],
+      "crud": [
+        "R"
+      ]
+    },
+    {
+      "name": "payments",
+      "attributes": [
+        "id",
+        "order_id",
+        "amount",
+        "method"
+      ],
+      "dependsOn": [
+        "orders",
+        "shipments"
+      ],
+      "dependedOnBy": [],
+      "crud": [
+        "C"
+      ]
+    },
+    {
+      "name": "shipments",
+      "attributes": [
+        "id",
+        "order_id",
+        "address",
+        "carrier"
+      ],
+      "dependsOn": [
+        "orders"
+      ],
+      "dependedOnBy": [
+        "payments"
+      ],
+      "crud": [
+        "C"
+      ]
+    },
+    {
+      "name": "order_items",
+      "attributes": [
+        "id",
+        "order_id",
+        "product_id",
+        "qty"
+      ],
+      "dependsOn": [
+        "orders",
+        "products"
+      ],
+      "dependedOnBy": [],
+      "crud": []
+    },
+    {
+      "name": "accounts",
+      "attributes": [
+        "id",
+        "customer_id",
+        "tier",
+        "active_since"
+      ],
+      "dependsOn": [
+        "customers"
+      ],
+      "dependedOnBy": [],
+      "crud": []
+    },
+    {
+      "name": "clients",
+      "attributes": [
+        "id",
+        "name",
+        "phone"
+      ],
+      "dependsOn": [],
+      "dependedOnBy": [],
+      "crud": []
+    },
+    {
+      "name": "sessions",
+      "attributes": [
+        "id",
+        "user_id",
+        "token",
+        "expires_at"
+      ],
+      "dependsOn": [],
+      "dependedOnBy": [],
+      "crud": []
+    },
+    {
+      "name": "outbox",
+      "attributes": [
+        "id",
+        "event_type",
+        "payload",
+        "published_at"
+      ],
+      "dependsOn": [],
+      "dependedOnBy": [],
+      "crud": []
+    },
+    {
+      "name": "ab_tests",
+      "attributes": [
+        "id",
+        "experiment",
+        "variant",
+        "bucket"
+      ],
+      "dependsOn": [],
+      "dependedOnBy": [],
+      "crud": []
+    }
+  ],
+  "usecases": [
+    {
+      "name": "ListOrders",
+      "entity": "orders",
+      "route": "GET /orders",
+      "crud": [
+        "R"
+      ]
+    },
+    {
+      "name": "GetOrder",
+      "entity": "orders",
+      "route": "GET /orders/:id",
+      "crud": [
+        "R"
+      ]
+    },
+    {
+      "name": "CreateOrder",
+      "entity": "orders",
+      "route": "POST /orders",
+      "crud": [
+        "C"
+      ]
+    },
+    {
+      "name": "ListCustomers",
+      "entity": "customers",
+      "route": "GET /customers",
+      "crud": [
+        "R"
+      ]
+    },
+    {
+      "name": "ListProducts",
+      "entity": "products",
+      "route": "GET /products",
+      "crud": [
+        "R"
+      ]
+    },
+    {
+      "name": "GetProduct",
+      "entity": "products",
+      "route": "GET /products/:id",
+      "crud": [
+        "R"
+      ]
+    },
+    {
+      "name": "CreatePayment",
+      "entity": "payments",
+      "route": "POST /payments",
+      "crud": [
+        "C"
+      ]
+    },
+    {
+      "name": "CreateShipment",
+      "entity": "shipments",
+      "route": "POST /shipments",
+      "crud": [
+        "C"
+      ]
+    }
+  ],
+  "crud": {
+    "gaps": [
+      {
+        "entity": "orders",
+        "missing": [
+          "U",
+          "D"
+        ]
+      },
+      {
+        "entity": "customers",
+        "missing": [
+          "C",
+          "U",
+          "D"
+        ]
+      },
+      {
+        "entity": "products",
+        "missing": [
+          "C",
+          "U",
+          "D"
+        ]
+      },
+      {
+        "entity": "payments",
+        "missing": [
+          "R",
+          "U",
+          "D"
+        ]
+      },
+      {
+        "entity": "shipments",
+        "missing": [
+          "R",
+          "U",
+          "D"
+        ]
+      },
+      {
+        "entity": "order_items",
+        "missing": [
+          "C",
+          "R",
+          "U",
+          "D"
+        ]
+      },
+      {
+        "entity": "accounts",
+        "missing": [
+          "C",
+          "R",
+          "U",
+          "D"
+        ]
+      },
+      {
+        "entity": "clients",
+        "missing": [
+          "C",
+          "R",
+          "U",
+          "D"
+        ]
+      },
+      {
+        "entity": "sessions",
+        "missing": [
+          "C",
+          "R",
+          "U",
+          "D"
+        ]
+      },
+      {
+        "entity": "outbox",
+        "missing": [
+          "C",
+          "R",
+          "U",
+          "D"
+        ]
+      },
+      {
+        "entity": "ab_tests",
+        "missing": [
+          "C",
+          "R",
+          "U",
+          "D"
+        ]
+      }
+    ],
+    "danglingUsecases": []
+  }
+}

@@ -1,0 +1,466 @@
+{
+  "version": 1,
+  "concepts": {
+    "concept:customer": {
+      "conceptId": "concept:customer",
+      "canonicalName": "Customer",
+      "aliases": [],
+      "kind": "aggregate-root",
+      "nodes": {
+        "intent": [
+          "intent:concept/concept:customer"
+        ],
+        "structure": [
+          "structure:entity/customers"
+        ],
+        "behavior": [
+          "behavior:route/GET /customers"
+        ]
+      },
+      "state": "aligned",
+      "decisions": []
+    },
+    "concept:order": {
+      "conceptId": "concept:order",
+      "canonicalName": "Order",
+      "aliases": [],
+      "kind": "aggregate-root",
+      "nodes": {
+        "intent": [
+          "intent:concept/concept:order"
+        ],
+        "structure": [
+          "structure:entity/orders"
+        ],
+        "behavior": [
+          "behavior:route/GET /orders",
+          "behavior:route/GET /orders/777",
+          "behavior:route/POST /orders"
+        ]
+      },
+      "state": "aligned",
+      "decisions": []
+    },
+    "concept:payment": {
+      "conceptId": "concept:payment",
+      "canonicalName": "Payment",
+      "aliases": [],
+      "kind": "aggregate-root",
+      "nodes": {
+        "intent": [
+          "intent:concept/concept:payment"
+        ],
+        "structure": [
+          "structure:entity/payments"
+        ],
+        "behavior": [
+          "behavior:route/POST /payments"
+        ]
+      },
+      "state": "violates-decision",
+      "decisions": [
+        "adr:0010"
+      ]
+    },
+    "concept:product": {
+      "conceptId": "concept:product",
+      "canonicalName": "Product",
+      "aliases": [],
+      "kind": "aggregate-root",
+      "nodes": {
+        "intent": [
+          "intent:concept/concept:product"
+        ],
+        "structure": [
+          "structure:entity/products"
+        ],
+        "behavior": [
+          "behavior:route/GET /products"
+        ]
+      },
+      "state": "aligned",
+      "decisions": []
+    },
+    "concept:refund": {
+      "conceptId": "concept:refund",
+      "canonicalName": "Refund",
+      "aliases": [],
+      "kind": "entity",
+      "nodes": {
+        "intent": [
+          "intent:concept/concept:refund"
+        ]
+      },
+      "state": "intent-only",
+      "decisions": []
+    },
+    "concept:route/GET /health": {
+      "conceptId": "concept:route/GET /health",
+      "canonicalName": "GET /health",
+      "aliases": [],
+      "nodes": {
+        "behavior": [
+          "behavior:route/GET /health"
+        ]
+      },
+      "state": "unmatched",
+      "decisions": []
+    },
+    "concept:route/POST /admin/reindex": {
+      "conceptId": "concept:route/POST /admin/reindex",
+      "canonicalName": "POST /admin/reindex",
+      "aliases": [],
+      "nodes": {
+        "structure": [
+          "structure:route/POST /admin/reindex"
+        ]
+      },
+      "state": "code-only",
+      "decisions": []
+    },
+    "concept:shipment": {
+      "conceptId": "concept:shipment",
+      "canonicalName": "Shipment",
+      "aliases": [],
+      "kind": "aggregate-root",
+      "nodes": {
+        "intent": [
+          "intent:concept/concept:shipment"
+        ],
+        "structure": [
+          "structure:entity/shipments"
+        ],
+        "behavior": [
+          "behavior:route/POST /shipments"
+        ]
+      },
+      "state": "aligned",
+      "decisions": []
+    },
+    "concept:struct/ab_tests": {
+      "conceptId": "concept:struct/ab_tests",
+      "canonicalName": "ab_tests",
+      "aliases": [],
+      "nodes": {
+        "structure": [
+          "structure:entity/ab_tests"
+        ]
+      },
+      "state": "code-only",
+      "decisions": []
+    },
+    "concept:struct/accounts": {
+      "conceptId": "concept:struct/accounts",
+      "canonicalName": "accounts",
+      "aliases": [],
+      "nodes": {
+        "structure": [
+          "structure:entity/accounts"
+        ]
+      },
+      "state": "adjudicated",
+      "decisions": [
+        "adr:0009"
+      ]
+    },
+    "concept:struct/clients": {
+      "conceptId": "concept:struct/clients",
+      "canonicalName": "clients",
+      "aliases": [],
+      "nodes": {
+        "structure": [
+          "structure:entity/clients"
+        ]
+      },
+      "state": "unmatched",
+      "decisions": []
+    },
+    "concept:struct/order_items": {
+      "conceptId": "concept:struct/order_items",
+      "canonicalName": "order_items",
+      "aliases": [],
+      "nodes": {
+        "structure": [
+          "structure:entity/order_items"
+        ]
+      },
+      "state": "aggregate-internal",
+      "decisions": []
+    },
+    "concept:struct/outbox": {
+      "conceptId": "concept:struct/outbox",
+      "canonicalName": "outbox",
+      "aliases": [],
+      "nodes": {
+        "structure": [
+          "structure:entity/outbox"
+        ]
+      },
+      "state": "implementation-detail",
+      "decisions": []
+    },
+    "concept:struct/sessions": {
+      "conceptId": "concept:struct/sessions",
+      "canonicalName": "sessions",
+      "aliases": [],
+      "nodes": {
+        "structure": [
+          "structure:entity/sessions"
+        ]
+      },
+      "state": "implementation-detail",
+      "decisions": []
+    }
+  },
+  "adrs": {
+    "adr:0009": {
+      "adrId": "adr:0009",
+      "title": "Split Customer into Customer + Account",
+      "status": "accepted",
+      "date": "2026-03-01",
+      "affects": [
+        "concept:customer"
+      ],
+      "constraints": [
+        {
+          "kind": "note",
+          "from": "concept:customer",
+          "text": "the `accounts` table is the Account side of the Customer split; the glossary has not been updated yet, so this divergence is adjudicated, not a defect"
+        }
+      ]
+    },
+    "adr:0010": {
+      "adrId": "adr:0010",
+      "title": "Payment must not depend on Shipping",
+      "status": "accepted",
+      "date": "2026-04-15",
+      "affects": [
+        "concept:payment",
+        "concept:shipment"
+      ],
+      "constraints": [
+        {
+          "kind": "forbid-dependency",
+          "from": "concept:payment",
+          "to": "concept:shipment",
+          "text": "Payment ↛ Shipping: settlement must not couple to fulfilment"
+        }
+      ]
+    }
+  },
+  "relations": [
+    {
+      "kind": "same-as",
+      "from": "structure:entity/orders",
+      "to": "concept:order",
+      "evidence": {
+        "name": {
+          "score": 1,
+          "note": "\"Order\" vs \"orders\""
+        },
+        "attributes": {
+          "score": 1,
+          "shared": [
+            "id",
+            "customerId",
+            "total",
+            "status",
+            "placedAt"
+          ]
+        },
+        "topology": {
+          "score": 1,
+          "note": "1↔1 deps"
+        },
+        "behavior": {
+          "score": 0.5,
+          "note": "CRUD CR"
+        }
+      },
+      "decidedBy": "auto",
+      "decidedAt": "2026-06-28T07:22:56.574Z"
+    },
+    {
+      "kind": "same-as",
+      "from": "structure:entity/customers",
+      "to": "concept:customer",
+      "evidence": {
+        "name": {
+          "score": 1,
+          "note": "\"Customer\" vs \"customers\""
+        },
+        "attributes": {
+          "score": 1,
+          "shared": [
+            "id",
+            "name",
+            "email"
+          ]
+        },
+        "topology": {
+          "score": 0,
+          "note": "no dependencies on either side"
+        },
+        "behavior": {
+          "score": 0.5,
+          "note": "CRUD R"
+        }
+      },
+      "decidedBy": "auto",
+      "decidedAt": "2026-06-28T07:22:56.574Z"
+    },
+    {
+      "kind": "same-as",
+      "from": "structure:entity/products",
+      "to": "concept:product",
+      "evidence": {
+        "name": {
+          "score": 1,
+          "note": "\"Product\" vs \"products\""
+        },
+        "attributes": {
+          "score": 1,
+          "shared": [
+            "id",
+            "name",
+            "price",
+            "sku"
+          ]
+        },
+        "topology": {
+          "score": 0,
+          "note": "no dependencies on either side"
+        },
+        "behavior": {
+          "score": 0.5,
+          "note": "CRUD R"
+        }
+      },
+      "decidedBy": "auto",
+      "decidedAt": "2026-06-28T07:22:56.574Z"
+    },
+    {
+      "kind": "same-as",
+      "from": "structure:entity/payments",
+      "to": "concept:payment",
+      "evidence": {
+        "name": {
+          "score": 1,
+          "note": "\"Payment\" vs \"payments\""
+        },
+        "attributes": {
+          "score": 1,
+          "shared": [
+            "id",
+            "orderId",
+            "amount",
+            "method"
+          ]
+        },
+        "topology": {
+          "score": 0.5,
+          "note": "2↔1 deps"
+        },
+        "behavior": {
+          "score": 0.5,
+          "note": "CRUD C"
+        }
+      },
+      "decidedBy": "auto",
+      "decidedAt": "2026-06-28T07:22:56.574Z"
+    },
+    {
+      "kind": "same-as",
+      "from": "structure:entity/shipments",
+      "to": "concept:shipment",
+      "evidence": {
+        "name": {
+          "score": 1,
+          "note": "\"Shipment\" vs \"shipments\""
+        },
+        "attributes": {
+          "score": 1,
+          "shared": [
+            "id",
+            "orderId",
+            "address",
+            "carrier"
+          ]
+        },
+        "topology": {
+          "score": 1,
+          "note": "1↔1 deps"
+        },
+        "behavior": {
+          "score": 0.5,
+          "note": "CRUD C"
+        }
+      },
+      "decidedBy": "auto",
+      "decidedAt": "2026-06-28T07:22:56.574Z"
+    },
+    {
+      "kind": "same-as",
+      "from": "structure:route/GET /orders",
+      "to": "behavior:route/GET /orders",
+      "decidedBy": "auto",
+      "decidedAt": "2026-06-28T07:22:56.574Z"
+    },
+    {
+      "kind": "same-as",
+      "from": "structure:route/GET /orders/:id",
+      "to": "behavior:route/GET /orders/777",
+      "decidedBy": "auto",
+      "decidedAt": "2026-06-28T07:22:56.574Z"
+    },
+    {
+      "kind": "same-as",
+      "from": "structure:route/POST /orders",
+      "to": "behavior:route/POST /orders",
+      "decidedBy": "auto",
+      "decidedAt": "2026-06-28T07:22:56.574Z"
+    },
+    {
+      "kind": "same-as",
+      "from": "structure:route/GET /customers",
+      "to": "behavior:route/GET /customers",
+      "decidedBy": "auto",
+      "decidedAt": "2026-06-28T07:22:56.574Z"
+    },
+    {
+      "kind": "same-as",
+      "from": "structure:route/GET /products",
+      "to": "behavior:route/GET /products",
+      "decidedBy": "auto",
+      "decidedAt": "2026-06-28T07:22:56.574Z"
+    },
+    {
+      "kind": "same-as",
+      "from": "structure:route/POST /payments",
+      "to": "behavior:route/POST /payments",
+      "decidedBy": "auto",
+      "decidedAt": "2026-06-28T07:22:56.574Z"
+    },
+    {
+      "kind": "same-as",
+      "from": "structure:route/POST /shipments",
+      "to": "behavior:route/POST /shipments",
+      "decidedBy": "auto",
+      "decidedAt": "2026-06-28T07:22:56.574Z"
+    },
+    {
+      "kind": "part-of",
+      "from": "structure:entity/order_items",
+      "to": "concept:order",
+      "decidedBy": "auto",
+      "decidedAt": "2026-06-28T07:22:56.574Z"
+    },
+    {
+      "kind": "part-of",
+      "from": "structure:entity/accounts",
+      "to": "concept:customer",
+      "decidedBy": "auto",
+      "decidedAt": "2026-06-28T07:22:56.574Z"
+    }
+  ]
+}

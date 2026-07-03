@@ -1,0 +1,32 @@
+[
+  {
+    "nodeId": "behavior:page/POST /orders",
+    "localName": "POST /orders",
+    "layer": "behavior",
+    "route": "POST /orders",
+    "raw": {
+      "url": "https://shop.example/orders",
+      "title": "Orders",
+      "inputItems": [{ "name": "customer_name" }, { "name": "total" }],
+      "displayItems": [{ "label": "Total" }, { "label": "Status" }],
+      "capabilities": ["place order", "ship order"],
+      "expectations": ["order is created"],
+      "saved": ["customer_name", "total"]
+    },
+    "source": { "tool": "loop-e2e" }
+  },
+  {
+    "nodeId": "behavior:event/orderplaced",
+    "localName": "OrderPlaced",
+    "layer": "behavior",
+    "raw": { "eventName": "OrderPlaced", "url": "https://shop.example/orders" },
+    "source": { "tool": "loop-e2e" }
+  },
+  {
+    "nodeId": "behavior:transition/orders--placed",
+    "localName": "/orders → placed",
+    "layer": "behavior",
+    "raw": { "kind": "transition", "from": "/orders", "to": "placed", "trigger": "submit" },
+    "source": { "tool": "loop-e2e" }
+  }
+]

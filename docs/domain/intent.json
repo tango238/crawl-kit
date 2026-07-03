@@ -1,0 +1,319 @@
+{
+  "concepts": [
+    {
+      "name": "VerificationRun",
+      "kind": "aggregate-root",
+      "context": "Verification",
+      "aliases": [],
+      "attributes": []
+    },
+    {
+      "name": "Finding",
+      "kind": "aggregate-root",
+      "context": "Verification",
+      "aliases": [],
+      "attributes": []
+    },
+    {
+      "name": "Boundary",
+      "kind": "aggregate-root",
+      "context": "Verification",
+      "aliases": [],
+      "attributes": []
+    },
+    {
+      "name": "Scenario",
+      "kind": "aggregate-root",
+      "context": "Scenario Lifecycle",
+      "aliases": [],
+      "attributes": []
+    },
+    {
+      "name": "KnownFinding",
+      "kind": "aggregate-root",
+      "context": "Convergence",
+      "aliases": [],
+      "attributes": []
+    },
+    {
+      "name": "Feedback",
+      "kind": "aggregate-root",
+      "context": "Convergence",
+      "aliases": [],
+      "attributes": []
+    },
+    {
+      "name": "SiteStructure",
+      "kind": "aggregate-root",
+      "context": "Observation",
+      "aliases": [],
+      "attributes": []
+    },
+    {
+      "name": "Concept / Registry",
+      "kind": "aggregate-root",
+      "context": "Reconciliation",
+      "aliases": [],
+      "attributes": []
+    }
+  ],
+  "events": [
+    {
+      "name": "AppCrawled",
+      "aggregate": "SiteStructure",
+      "context": "Observation",
+      "trigger": "capture(crawl)",
+      "properties": [
+        "pages",
+        "occurredOn"
+      ],
+      "consumer": "Observation"
+    },
+    {
+      "name": "SiteStructureExtracted",
+      "aggregate": "SiteStructure",
+      "context": "Observation",
+      "trigger": "extract(llm)",
+      "properties": [
+        "pages",
+        "occurredOn"
+      ],
+      "consumer": "Observation"
+    },
+    {
+      "name": "BehaviorEmitted",
+      "aggregate": "SiteStructure",
+      "context": "Observation",
+      "trigger": "emit()",
+      "properties": [
+        "nodes",
+        "occurredOn"
+      ],
+      "consumer": "Reconciliation"
+    },
+    {
+      "name": "UnifiedGenerated",
+      "aggregate": "Registry",
+      "context": "Reconciliation",
+      "trigger": "reconcile()",
+      "properties": [
+        "unifiedRef",
+        "concepts",
+        "occurredOn"
+      ],
+      "consumer": "Verification"
+    },
+    {
+      "name": "FindingProduced",
+      "aggregate": "Finding",
+      "context": "Verification",
+      "trigger": "produce(discrepancy, runId)",
+      "properties": [
+        "findingId",
+        "discrepancy",
+        "occurredOn"
+      ],
+      "consumer": "Convergence"
+    },
+    {
+      "name": "VerdictReached",
+      "aggregate": "Finding",
+      "context": "Verification",
+      "trigger": "adjudicate(votes)",
+      "properties": [
+        "findingId",
+        "verdict",
+        "occurredOn"
+      ],
+      "consumer": "Reporting"
+    },
+    {
+      "name": "KnownStateUpdated",
+      "aggregate": "KnownFinding",
+      "context": "Convergence",
+      "trigger": "record(fingerprint, reason, by)",
+      "properties": [
+        "fingerprint",
+        "occurredOn"
+      ],
+      "consumer": "Verification"
+    },
+    {
+      "name": "ScenarioApproved",
+      "aggregate": "Scenario",
+      "context": "Scenario Lifecycle",
+      "trigger": "approve()",
+      "properties": [
+        "scenarioId",
+        "occurredOn"
+      ],
+      "consumer": "Verification"
+    },
+    {
+      "name": "ReportGenerated",
+      "aggregate": "Report",
+      "context": "Reporting",
+      "trigger": "generate()",
+      "properties": [
+        "runId",
+        "summary",
+        "occurredOn"
+      ],
+      "consumer": "Reporting"
+    }
+  ],
+  "stateTransitions": [
+    {
+      "aggregate": "VerificationRun",
+      "context": "Verification",
+      "from": "∅",
+      "to": "Running",
+      "trigger": "startRun(unifiedRef, target)",
+      "event": "RunStarted"
+    },
+    {
+      "aggregate": "VerificationRun",
+      "context": "Verification",
+      "from": "Running",
+      "to": "Completed",
+      "trigger": "completeRun()",
+      "event": "RunCompleted"
+    },
+    {
+      "aggregate": "Finding",
+      "context": "Verification",
+      "from": "∅",
+      "to": "Produced",
+      "trigger": "produce(discrepancy, runId)",
+      "event": "FindingProduced"
+    },
+    {
+      "aggregate": "Finding",
+      "context": "Verification",
+      "from": "Produced",
+      "to": "Adjudicated",
+      "trigger": "adjudicate(votes)",
+      "event": "VerdictReached"
+    },
+    {
+      "aggregate": "Scenario",
+      "context": "Scenario Lifecycle",
+      "from": "∅",
+      "to": "proposed",
+      "trigger": "propose()",
+      "event": "ScenariosProposed"
+    },
+    {
+      "aggregate": "Scenario",
+      "context": "Scenario Lifecycle",
+      "from": "proposed",
+      "to": "active",
+      "trigger": "approve()",
+      "event": "ScenarioApproved"
+    },
+    {
+      "aggregate": "KnownFinding",
+      "context": "Convergence",
+      "from": "∅",
+      "to": "Known",
+      "trigger": "record(fingerprint, reason, by)",
+      "event": "KnownStateUpdated"
+    },
+    {
+      "aggregate": "Feedback",
+      "context": "Convergence",
+      "from": "∅",
+      "to": "Submitted",
+      "trigger": "submit()",
+      "event": "FeedbackSubmitted"
+    },
+    {
+      "aggregate": "Feedback",
+      "context": "Convergence",
+      "from": "Submitted",
+      "to": "Verified",
+      "trigger": "verify()",
+      "event": "FeedbackVerified"
+    },
+    {
+      "aggregate": "SiteStructure",
+      "context": "Observation",
+      "from": "∅",
+      "to": "Captured",
+      "trigger": "capture(crawl)",
+      "event": "AppCrawled"
+    },
+    {
+      "aggregate": "SiteStructure",
+      "context": "Observation",
+      "from": "Captured",
+      "to": "Extracted",
+      "trigger": "extract(llm)",
+      "event": "SiteStructureExtracted"
+    },
+    {
+      "aggregate": "Concept / Registry",
+      "context": "Reconciliation",
+      "from": "∅",
+      "to": "intent-only",
+      "trigger": "reconcile()",
+      "event": null
+    },
+    {
+      "aggregate": "Concept / Registry",
+      "context": "Reconciliation",
+      "from": "intent-only",
+      "to": "aligned",
+      "trigger": "attach()",
+      "event": null
+    },
+    {
+      "aggregate": "Concept / Registry",
+      "context": "Reconciliation",
+      "from": "∅",
+      "to": "unmatched",
+      "trigger": "classifyUnmatched()",
+      "event": null
+    },
+    {
+      "aggregate": "Concept / Registry",
+      "context": "Reconciliation",
+      "from": "∅",
+      "to": "aggregate-internal",
+      "trigger": "classifyUnmatched()",
+      "event": null
+    },
+    {
+      "aggregate": "Concept / Registry",
+      "context": "Reconciliation",
+      "from": "∅",
+      "to": "implementation-detail",
+      "trigger": "classifyUnmatched()",
+      "event": null
+    },
+    {
+      "aggregate": "Concept / Registry",
+      "context": "Reconciliation",
+      "from": "∅",
+      "to": "code-only",
+      "trigger": "classifyUnmatched()",
+      "event": null
+    },
+    {
+      "aggregate": "Concept / Registry",
+      "context": "Reconciliation",
+      "from": "code-only",
+      "to": "adjudicated",
+      "trigger": "applyAdr()",
+      "event": null
+    },
+    {
+      "aggregate": "Concept / Registry",
+      "context": "Reconciliation",
+      "from": "aligned",
+      "to": "violates-decision",
+      "trigger": "applyAdr()",
+      "event": null
+    }
+  ]
+}

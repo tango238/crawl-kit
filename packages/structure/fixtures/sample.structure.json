@@ -1,0 +1,36 @@
+{
+  "entities": [
+    { "name": "orders",      "attributes": ["id", "customer_id", "total", "status", "placed_at"], "dependsOn": ["customers"], "source": "db/schema.sql:orders" },
+    { "name": "customers",   "attributes": ["id", "name", "email"], "source": "db/schema.sql:customers" },
+    { "name": "products",    "attributes": ["id", "name", "price", "sku"], "source": "db/schema.sql:products" },
+    { "name": "payments",    "attributes": ["id", "order_id", "amount", "method"], "dependsOn": ["orders", "shipments"], "source": "db/schema.sql:payments" },
+    { "name": "shipments",   "attributes": ["id", "order_id", "address", "carrier"], "dependsOn": ["orders"], "source": "db/schema.sql:shipments" },
+    { "name": "order_items", "attributes": ["id", "order_id", "product_id", "qty"], "dependsOn": ["orders", "products"], "source": "db/schema.sql:order_items" },
+    { "name": "accounts",    "attributes": ["id", "customer_id", "tier", "active_since"], "dependsOn": ["customers"], "source": "db/schema.sql:accounts" },
+    { "name": "clients",     "attributes": ["id", "name", "phone"], "source": "db/schema.sql:clients" },
+    { "name": "sessions",    "attributes": ["id", "user_id", "token", "expires_at"], "source": "db/schema.sql:sessions" },
+    { "name": "outbox",      "attributes": ["id", "event_type", "payload", "published_at"], "source": "db/schema.sql:outbox" },
+    { "name": "ab_tests",    "attributes": ["id", "experiment", "variant", "bucket"], "source": "db/schema.sql:ab_tests" }
+  ],
+  "routes": [
+    { "method": "GET",  "path": "/orders",        "handler": "listOrders",    "source": "src/routes/orders.ts:12" },
+    { "method": "GET",  "path": "/orders/:id",    "handler": "getOrder",      "source": "src/routes/orders.ts:20" },
+    { "method": "POST", "path": "/orders",        "handler": "createOrder",   "source": "src/routes/orders.ts:31" },
+    { "method": "GET",  "path": "/customers",     "handler": "listCustomers", "source": "src/routes/customers.ts:8" },
+    { "method": "GET",  "path": "/products",      "handler": "listProducts",  "source": "src/routes/products.ts:9" },
+    { "method": "GET",  "path": "/products/:id",  "handler": "getProduct",    "source": "src/routes/products.ts:17" },
+    { "method": "POST", "path": "/payments",      "handler": "createPayment", "source": "src/routes/payments.ts:14" },
+    { "method": "POST", "path": "/shipments",     "handler": "createShipment","source": "src/routes/shipments.ts:11" },
+    { "method": "POST", "path": "/admin/reindex", "handler": "reindex",       "source": "src/routes/admin.ts:5" }
+  ],
+  "usecases": [
+    { "name": "ListOrders",     "entity": "orders",    "route": { "method": "GET",  "path": "/orders" },       "crud": ["R"] },
+    { "name": "GetOrder",       "entity": "orders",    "route": { "method": "GET",  "path": "/orders/:id" },   "crud": ["R"] },
+    { "name": "CreateOrder",    "entity": "orders",    "route": { "method": "POST", "path": "/orders" },       "crud": ["C"] },
+    { "name": "ListCustomers",  "entity": "customers", "route": { "method": "GET",  "path": "/customers" },    "crud": ["R"] },
+    { "name": "ListProducts",   "entity": "products",  "route": { "method": "GET",  "path": "/products" },     "crud": ["R"] },
+    { "name": "GetProduct",     "entity": "products",  "route": { "method": "GET",  "path": "/products/:id" }, "crud": ["R"] },
+    { "name": "CreatePayment",  "entity": "payments",  "route": { "method": "POST", "path": "/payments" },     "crud": ["C"] },
+    { "name": "CreateShipment", "entity": "shipments", "route": { "method": "POST", "path": "/shipments" },    "crud": ["C"] }
+  ]
+}

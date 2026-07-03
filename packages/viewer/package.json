@@ -1,0 +1,33 @@
+{
+  "name": "@crawl-kit/viewer",
+  "version": "0.1.0",
+  "description": "Stateless view: reads unified.json and colours the divergences.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "public"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "dev": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "@crawl-kit/contract": "workspace:*",
+    "@crawl-kit/structure": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  },
+  "private": true
+}

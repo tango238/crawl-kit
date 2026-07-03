@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>差分 — crawl-kit</title>
+<style>
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; padding: 2rem; background: #0d1117; color: #e6edf3;
+  font: 14px/1.55 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+.sub { color: #8b949e; margin: 0 0 1.5rem; }
+h2 { font-size: 1.05rem; margin: 2rem 0 .5rem; border-bottom: 1px solid #21262d; padding-bottom: .3rem; }
+h3 { font-size: .95rem; margin: 1.5rem 0 .4rem; color: #c9d1d9; }
+.badge { font-size: .75rem; font-weight: 400; color: #8b949e; margin-left: .5rem; }
+.muted, .empty { color: #6e7681; font-weight: 400; }
+table { width: 100%; border-collapse: collapse; margin: .25rem 0 1rem; }
+th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid #1b212a; vertical-align: top; }
+thead th { color: #8b949e; font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
+tbody th { font-weight: 600; color: #e6edf3; white-space: nowrap; }
+tbody tr.gap th { color: #f0b72f; }
+td.ok code { color: #7ee787; }
+td.via-evidence code, td.via-evidence { color: #56d4bc; } /* concept + capability evidence */
+td.via-concept code, td.via-concept { color: #79c0ff; } /* concept-only (coarse join) */
+td.gap { color: #f0b72f; }
+code { background: #161b22; padding: .05rem .35rem; border-radius: 4px; font-size: .85em; }
+td.ok code { background: #0f261a; }
+.ref { display: block; color: #6e7681; font-size: .75rem; margin-top: .15rem; }
+.agg { display: block; color: #8b949e; font-size: .72rem; font-weight: 400; }
+.layer { color: #8b949e; font-size: .75rem; }
+ul.cand { list-style: none; padding-left: 0; }
+ul.cand li { padding: .25rem 0; border-bottom: 1px solid #161b22; }
+.legend { margin-top: 2.5rem; color: #6e7681; font-size: .8rem; }
+table.findings td { font-size: .85rem; }
+.pill { display: inline-block; padding: .05rem .45rem; border-radius: 10px; font-size: .72rem; font-weight: 600; }
+.pill.bug { background: #3d1418; color: #ff7b72; }
+.pill.uncertain { background: #3a3413; color: #f0b72f; }
+.pill.unnecessary { background: #21262d; color: #8b949e; }
+tr.cls-bug th, tr.cls-bug td { background: rgba(248,81,73,.04); }
+tr.b-high td { color: #ff7b72; }
+tr.b-medium td { color: #f0b72f; }
+tr.b-low td { color: #d29922; }
+tr.b-ok td { color: #7ee787; }
+</style></head>
+<body>
+<h1>差分ビュー — crawl-kit</h1>
+<p class="sub">intent を軸に、structure / behavior を横並びで比較。⚠ = intent にあるが対応が無い（gap）。</p>
+<h2>イベント <span class="badge">0/9 aligned · 9 ⚠</span></h2>
+  <table>
+    <thead><tr><th>intent（軸）</th><th>intent</th><th>structure</th><th>behavior</th></tr></thead>
+    <tbody><tr class="gap">
+    <th scope="row">AppCrawled<span class="agg">SiteStructure</span></th>
+    <td class="ok"><code>AppCrawled</code><span class="ref">capture(crawl)</span></td>
+    <td class="gap">⚠ gap</td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="gap">
+    <th scope="row">SiteStructureExtracted<span class="agg">SiteStructure</span></th>
+    <td class="ok"><code>SiteStructureExtracted</code><span class="ref">extract(llm)</span></td>
+    <td class="gap">⚠ gap</td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="gap">
+    <th scope="row">BehaviorEmitted<span class="agg">SiteStructure</span></th>
+    <td class="ok"><code>BehaviorEmitted</code><span class="ref">emit()</span></td>
+    <td class="gap">⚠ gap</td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="gap">
+    <th scope="row">UnifiedGenerated<span class="agg">Registry</span></th>
+    <td class="ok"><code>UnifiedGenerated</code><span class="ref">reconcile()</span></td>
+    <td class="gap">⚠ gap</td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="gap">
+    <th scope="row">FindingProduced<span class="agg">Finding</span></th>
+    <td class="ok"><code>FindingProduced</code><span class="ref">produce(discrepancy, runId)</span></td>
+    <td class="gap">⚠ gap</td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="gap">
+    <th scope="row">VerdictReached<span class="agg">Finding</span></th>
+    <td class="ok"><code>VerdictReached</code><span class="ref">adjudicate(votes)</span></td>
+    <td class="gap">⚠ gap</td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="gap">
+    <th scope="row">KnownStateUpdated<span class="agg">KnownFinding</span></th>
+    <td class="ok"><code>KnownStateUpdated</code><span class="ref">record(fingerprint, reason, by)</span></td>
+    <td class="gap">⚠ gap</td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="gap">
+    <th scope="row">ScenarioApproved<span class="agg">Scenario</span></th>
+    <td class="ok"><code>ScenarioApproved</code><span class="ref">approve()</span></td>
+    <td class="gap">⚠ gap</td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="gap">
+    <th scope="row">ReportGenerated<span class="agg">Report</span></th>
+    <td class="ok"><code>ReportGenerated</code><span class="ref">generate()</span></td>
+    <td class="gap">⚠ gap</td>
+    <td class="gap">⚠ not observed</td>
+  </tr></tbody>
+  </table>
+<h2>状態遷移 <span class="badge">10/19 aligned · 9 ⚠</span></h2>
+  <table>
+    <thead><tr><th>intent（軸）</th><th>intent</th><th>structure</th><th>behavior</th></tr></thead>
+    <tbody><tr class="gap">
+    <th scope="row">∅ → Running<span class="agg">VerificationRun</span></th>
+    <td class="ok"><code>∅ → Running</code><span class="ref">startRun(unifiedRef, target)</span></td>
+    <td class="gap">⚠ gap</td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="gap">
+    <th scope="row">Running → Completed<span class="agg">VerificationRun</span></th>
+    <td class="ok"><code>Running → Completed</code><span class="ref">completeRun()</span></td>
+    <td class="gap">⚠ gap</td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="gap">
+    <th scope="row">∅ → Produced<span class="agg">Finding</span></th>
+    <td class="ok"><code>∅ → Produced</code><span class="ref">produce(discrepancy, runId)</span></td>
+    <td class="gap">⚠ gap</td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="aligned">
+    <th scope="row">Produced → Adjudicated<span class="agg">Finding</span></th>
+    <td class="ok"><code>Produced → Adjudicated</code><span class="ref">adjudicate(votes)</span></td>
+    <td class="ok"><code>? → adjudicated</code><span class="ref">packages/reconciler/src/pipeline.ts:261</span></td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="aligned">
+    <th scope="row">∅ → proposed<span class="agg">Scenario</span></th>
+    <td class="ok"><code>∅ → proposed</code><span class="ref">propose()</span></td>
+    <td class="ok"><code>? → proposed</code><span class="ref">packages/contract/src/model.ts:125</span></td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="gap">
+    <th scope="row">proposed → active<span class="agg">Scenario</span></th>
+    <td class="ok"><code>proposed → active</code><span class="ref">approve()</span></td>
+    <td class="gap">⚠ gap</td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="gap">
+    <th scope="row">∅ → Known<span class="agg">KnownFinding</span></th>
+    <td class="ok"><code>∅ → Known</code><span class="ref">record(fingerprint, reason, by)</span></td>
+    <td class="gap">⚠ gap</td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="gap">
+    <th scope="row">∅ → Submitted<span class="agg">Feedback</span></th>
+    <td class="ok"><code>∅ → Submitted</code><span class="ref">submit()</span></td>
+    <td class="gap">⚠ gap</td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="gap">
+    <th scope="row">Submitted → Verified<span class="agg">Feedback</span></th>
+    <td class="ok"><code>Submitted → Verified</code><span class="ref">verify()</span></td>
+    <td class="gap">⚠ gap</td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="gap">
+    <th scope="row">∅ → Captured<span class="agg">SiteStructure</span></th>
+    <td class="ok"><code>∅ → Captured</code><span class="ref">capture(crawl)</span></td>
+    <td class="gap">⚠ gap</td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="gap">
+    <th scope="row">Captured → Extracted<span class="agg">SiteStructure</span></th>
+    <td class="ok"><code>Captured → Extracted</code><span class="ref">extract(llm)</span></td>
+    <td class="gap">⚠ gap</td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="aligned">
+    <th scope="row">∅ → intent-only<span class="agg">Concept / Registry</span></th>
+    <td class="ok"><code>∅ → intent-only</code><span class="ref">reconcile()</span></td>
+    <td class="ok"><code>? → intent-only</code><span class="ref">packages/reconciler/src/pipeline.ts:118</span></td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="aligned">
+    <th scope="row">intent-only → aligned<span class="agg">Concept / Registry</span></th>
+    <td class="ok"><code>intent-only → aligned</code><span class="ref">attach()</span></td>
+    <td class="ok"><code>? → aligned</code><span class="ref">packages/reconciler/src/pipeline.ts:132</span></td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="aligned">
+    <th scope="row">∅ → unmatched<span class="agg">Concept / Registry</span></th>
+    <td class="ok"><code>∅ → unmatched</code><span class="ref">classifyUnmatched()</span></td>
+    <td class="ok"><code>? → unmatched</code><span class="ref">packages/reconciler/src/classify.ts:45</span></td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="aligned">
+    <th scope="row">∅ → aggregate-internal<span class="agg">Concept / Registry</span></th>
+    <td class="ok"><code>∅ → aggregate-internal</code><span class="ref">classifyUnmatched()</span></td>
+    <td class="ok"><code>? → aggregate-internal</code><span class="ref">packages/reconciler/src/classify.ts:52</span></td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="aligned">
+    <th scope="row">∅ → implementation-detail<span class="agg">Concept / Registry</span></th>
+    <td class="ok"><code>∅ → implementation-detail</code><span class="ref">classifyUnmatched()</span></td>
+    <td class="ok"><code>? → implementation-detail</code><span class="ref">packages/reconciler/src/classify.ts:61</span></td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="aligned">
+    <th scope="row">∅ → code-only<span class="agg">Concept / Registry</span></th>
+    <td class="ok"><code>∅ → code-only</code><span class="ref">classifyUnmatched()</span></td>
+    <td class="ok"><code>? → code-only</code><span class="ref">packages/reconciler/src/classify.ts:64</span></td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="aligned">
+    <th scope="row">code-only → adjudicated<span class="agg">Concept / Registry</span></th>
+    <td class="ok"><code>code-only → adjudicated</code><span class="ref">applyAdr()</span></td>
+    <td class="ok"><code>? → adjudicated</code><span class="ref">packages/reconciler/src/pipeline.ts:261</span></td>
+    <td class="gap">⚠ not observed</td>
+  </tr>
+<tr class="aligned">
+    <th scope="row">aligned → violates-decision<span class="agg">Concept / Registry</span></th>
+    <td class="ok"><code>aligned → violates-decision</code><span class="ref">applyAdr()</span></td>
+    <td class="ok"><code>? → violates-decision</code><span class="ref">packages/reconciler/src/pipeline.ts:246</span></td>
+    <td class="gap">⚠ not observed</td>
+  </tr></tbody>
+  </table>
+<h2>システム境界 (Boundary) <span class="badge">0 ok · 3 問題（0 high）／ 3 チェック · 入力→表示→保存</span></h2>
+  <table class="findings">
+    <thead><tr><th></th><th>route</th><th>facet</th><th>kind</th><th>detail</th></tr></thead>
+    <tbody><tr class="b-low">
+      <td>⚠</td>
+      <td><code>POST /orders</code></td>
+      <td>persistence</td>
+      <td><code>persistence-unobserved</code></td>
+      <td>C/U 境界だが保存が観測されていない（未検証）</td>
+    </tr>
+<tr class="b-low">
+      <td>⚠</td>
+      <td><code>POST /payments</code></td>
+      <td>persistence</td>
+      <td><code>persistence-unobserved</code></td>
+      <td>C/U 境界だが保存が観測されていない（未検証）</td>
+    </tr>
+<tr class="b-low">
+      <td>⚠</td>
+      <td><code>POST /shipments</code></td>
+      <td>persistence</td>
+      <td><code>persistence-unobserved</code></td>
+      <td>C/U 境界だが保存が観測されていない（未検証）</td>
+    </tr></tbody>
+  </table>
+<h2>検証結果 (Verification) <span class="badge">2 bug · 5 uncertain · 0 unnecessary</span></h2>
+  <table class="findings">
+    <thead><tr><th>判定</th><th>severity</th><th>category</th><th>location</th><th>expected → actual</th><th>conf.</th></tr></thead>
+    <tbody><tr class="cls-bug">
+      <td><span class="pill bug">bug</span></td>
+      <td>high</td>
+      <td><code>runtime-error</code></td>
+      <td>Order<span class="ref">concept:order</span></td>
+      <td>実行時にエラーが起きない <span class="muted">→</span> GET /orders/777: 5xx on missing order (500)</td>
+      <td>85%</td>
+    </tr>
+<tr class="cls-bug">
+      <td><span class="pill bug">bug</span></td>
+      <td>high</td>
+      <td><code>decision-violation</code></td>
+      <td>Payment<span class="ref">concept:payment</span></td>
+      <td>ADR の制約が守られている <span class="muted">→</span> Payment ↛ Shipping: settlement must not couple to fulfilment</td>
+      <td>90%</td>
+    </tr>
+<tr class="cls-uncertain">
+      <td><span class="pill uncertain">uncertain</span></td>
+      <td>medium</td>
+      <td><code>undocumented-runtime</code></td>
+      <td>GET /health<span class="ref">concept:route/GET /health</span></td>
+      <td>実行時の振る舞いが設計に対応する <span class="muted">→</span> behavior に在るが structure/intent に無い</td>
+      <td>50%</td>
+    </tr>
+<tr class="cls-uncertain">
+      <td><span class="pill uncertain">uncertain</span></td>
+      <td>medium</td>
+      <td><code>unverified-build</code></td>
+      <td>POST /admin/reindex<span class="ref">concept:route/POST /admin/reindex</span></td>
+      <td>実装が実行時に観測される <span class="muted">→</span> structure に在るが behavior 未観測</td>
+      <td>50%</td>
+    </tr>
+<tr class="cls-uncertain">
+      <td><span class="pill uncertain">uncertain</span></td>
+      <td>medium</td>
+      <td><code>unverified-build</code></td>
+      <td>ab_tests<span class="ref">concept:struct/ab_tests</span></td>
+      <td>実装が実行時に観測される <span class="muted">→</span> structure に在るが behavior 未観測</td>
+      <td>50%</td>
+    </tr>
+<tr class="cls-uncertain">
+      <td><span class="pill uncertain">uncertain</span></td>
+      <td>medium</td>
+      <td><code>undocumented-runtime</code></td>
+      <td>clients<span class="ref">concept:struct/clients</span></td>
+      <td>実行時の振る舞いが設計に対応する <span class="muted">→</span> behavior に在るが structure/intent に無い</td>
+      <td>50%</td>
+    </tr>
+<tr class="cls-uncertain">
+      <td><span class="pill uncertain">uncertain</span></td>
+      <td>low</td>
+      <td><code>unbuilt-intent</code></td>
+      <td>Refund<span class="ref">concept:refund</span></td>
+      <td>設計が実装されている <span class="muted">→</span> intent に在るが structure/behavior 無し</td>
+      <td>40%</td>
+    </tr></tbody>
+  </table>
+<h3>候補イベント <span class="muted">— intent に無い（gap の埋め合わせ候補としてのみ）</span></h3><ul class="cand"><li><code>GlossaryEvent</code> <span class="layer">structure</span> <span class="ref">packages/intent/src/model.ts:37</span></li>
+<li><code>StructureEvent</code> <span class="layer">structure</span> <span class="ref">packages/structure/src/model.ts:61</span></li>
+<li><code>IntentEvent</code> <span class="layer">structure</span> <span class="ref">packages/viewer/src/diff-view.ts:12</span></li></ul>
+<h3>候補・状態遷移 <span class="muted">— intent に無い（gap の埋め合わせ候補としてのみ）</span></h3><ul class="cand"><li><code>?: ? → open</code> <span class="layer">structure</span> <span class="ref">packages/behavior/src/services/github/issues.ts:31</span></li>
+<li><code>?: ? → shipped</code> <span class="layer">structure</span> <span class="ref">packages/structure/src/analyze/events.ts:15</span></li>
+<li><code>?: ? → placed</code> <span class="layer">structure</span> <span class="ref">packages/structure/src/analyze/events.ts:15</span></li></ul>
+<p class="legend">行は intent から生える（intent に無いものは行にしない）。behavior は3段階: <span style="color:#7ee787">緑 = 完全一致（同名の実行時 event/transition）</span>／<span style="color:#56d4bc">◇ teal = concept 結合＋ページ能力がこの項目を裏付け</span>／<span style="color:#79c0ff">▱ 青 = aggregate は動くがこの項目の裏付けは無い（粗い結合）</span>／⚠ = gap。candidates は intent に対応の無い構造・挙動で、gap 行への割当提案としてのみ。</p>
+</body></html>

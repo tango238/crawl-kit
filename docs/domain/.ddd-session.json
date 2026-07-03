@@ -1,0 +1,87 @@
+{
+  "currentPhase": "aggregates",
+  "completedPhases": [
+    "discover",
+    "storming",
+    "contexts",
+    "mapping",
+    "aggregates",
+    "events",
+    "sync",
+    "publish"
+  ],
+  "lastUpdated": "2026-06-28",
+  "openQuestions": [
+    "Convergence の burn-in と Reconciliation の burn-in を共有ライブラリ化するか（語彙は別のまま）",
+    "検証の『期待』に intent をどこまで使うか（intent 非所有のため最小依存に留めるか）",
+    "[完] ConceptState を Concept/Registry の状態機械として intent に定義（classify.ts/pipeline.ts/adr.ts 由来の8状態＋遷移）。intent↔code の status リテラルは 8/8 aligned。intent.json transitions=19",
+    "[完] packages/structure に events/状態遷移の決定的抽出を追加（analyze/events.ts + scan.ts）。intent↔structure: 全 intent イベントが gap（コードは関数型で named event 構造なし）、コード側は ConceptState 遷移を保持",
+    "[完] 横並びビューア packages/viewer（diff-view.ts/diff-html.ts/diff-cli.ts）。pnpm --filter @crawl-kit/viewer diff → data/diff.html。intent 軸 | structure | behavior。events 0/9 aligned・transitions 10/19 aligned・candidates 6。behavior 軸は未観測（not observed）",
+    "[完] behavior 軸接続: emitBehaviorTransitionNodes（behavior:transition/）+ diff-view が behavior 列対応 + diff-cli が behavior.nodes.json 読込。Order デモで3列 aligned 実証。crawl-kit 実体は非クロール対象で not observed",
+    "[完] reconciler 経由 behavior 整合（3段階に精緻化）: diff-view conceptBehavior に signals(bound page の capability/expectation) を追加。behavior 列= exact(緑) > concept-evidence(◇teal: 能力テキストがその event/state を裏付け、stem 照合) > concept(▱青: aggregate のみ観測) > not observed。diff-cli が unified.json の concept.behavior[].raw から signals 抽出。実 reconcile デモで3段階実証",
+    "[完] ライブ表示: assemble ロジックを diff-assemble.ts に共有化（CLI/サーバ両用）。server.ts に /diff（HTML）/diff.json を追加、毎リクエスト data/ から再構築。PORT=4399 pnpm --filter @crawl-kit/viewer dev → /diff",
+    "[完] verification 結果を viewer に表示: DiffView.findings 追加、diff-html に『検証結果』セクション（worst-first・pill 判定）、diff-assemble が verification.findings.json 読込。/diff・/diff.json・CLI(--findings) 反映",
+    "[完] system 境界軸（Core 検証）一通り実装: P0 Boundary を aggregates.md に定義／P1 structure RouteRecord.inputs(formFields) 配管／P2 verification boundary.ts（input/display/persistence の triple 照合・route キー join=normalizeRoute・findings: not-persisted/input-*/display-unbacked/roundtrip-ok）＋ boundary.findings.json／P3 viewer に『システム境界』セクション。end-to-end 実証（not-persisted high 含む4種）＋ pnpm demo 実パイプライン緑",
+    "[完] viewer ビュー統一: 旧『概念マップ(reconcile 8状態)』タブを廃止し、差分ビュー(intent軸 events/transitions/boundary/verification)を『概念マップ』に改名して一本化。8状態の情報は検証 findings(violates-decision/unbuilt-intent/undocumented-runtime 等)として表出。reconcileTable/renderDiffHtml/diff コマンドも削除済み",
+    "[記録] 取得鮮度(Acquisition Freshness) サブドメインを discovery.md に追記。structure=ディレクトリ単位/behavior=ページ単位、変化シグナル=全ファイル内容ハッシュ、TTL 単一共通、ストア=data/acquisition.json。既存 ParsedRoute/ParsedPage で router/view 検知は充足、新規は鮮度ストア＋ハッシュ走査＋route/page 差分。実装計画 P1(freshness pkg)→P2(structure gate)→P3(behavior crawl)→P4(CLI)",
+    "[完] 取得鮮度 P1: @crawl-kit/freshness 新設（model/hash/freshness/store、純粋ロジック＋テスト12）。contract に DATA_FILES.acquisition 追加。P2a: cli analyze に鮮度ゲート（無変更&TTL内→スキップ、--ttl/--force）。/tmp/ck-fresh で初回/スキップ/編集/追加/force を実証。全8pkg green",
+    "[完] 取得鮮度 P3: planBehaviorCrawl(freshness)＋cli behavior-plan（structure route×鮮度→crawl/skip/drop、loop-e2e が消費）。freshness テスト14。OPERATIONS/README に鮮度節。仕様(per-dir last-acquire＋TTL/内容ハッシュ＋cull＋behavior page鮮度)は充足",
+    "[非目標] P2b 部分 LLM 再解析: 現状は鮮度ゲートでリポジトリ一括の要否判定。per-dir 部分 LLM は LLM 実行が要り検証不能なため将来最適化として保留（ユーザー仕様は repo 一括＋per-dir 鮮度追跡で充足）",
+    "[完] behavior 実取得を crawl-kit に統合: analyze-structure / analyze-behavior に分割、analyze で両方。behavior は crawl-kit が loop-e2e エンジン(@crawl-kit/behavior の loop-e2e bin、./cli export 追加)を spawn して実クロール→emit→recordBehavior（鮮度ゲート付き）。bundle は軽量維持（playwright 非同梱・spawn のみ、エンジン未導入は graceful 警告）。cli 0.2.0。/tmp で structure gate＋behavior spawn＋analyze 両走を実証",
+    "[次] 保存観測(saved)の loop-e2e 実配線（registeredData/dbProbe→behavior node raw.saved）／behavior の per-page 部分クロール（loop-e2e に route 部分集合の口）",
+    "[次] event 抽出ヒューリスティックの精度（現状 *Event/過去形+複合名。contract 型 GlossaryEvent/StructureEvent を誤検出）"
+  ],
+  "queue": [],
+  "queueIndex": 0,
+  "queueAuto": false,
+  "divergences": [
+    {
+      "id": 1,
+      "fromPhase": "discover",
+      "type": "gap",
+      "authority": "model",
+      "decision": "Core=検証(behavior) が 97 LOC スタブ → loop-e2e 本体(9,068 LOC + 562 tests)を packages/behavior に忠実移植。rdra-export は contract emit に置換。build/test green。",
+      "status": "done"
+    },
+    {
+      "id": 2,
+      "fromPhase": "discover",
+      "type": "violation",
+      "authority": "model",
+      "decision": "【実装】packages/verification を新設し unified.json→Finding/Verdict を生成（名寄せでなく検証判定）。reconciler の behavior 名寄せ自体の整理は残。slice 緑。",
+      "status": "in-progress"
+    },
+    {
+      "id": 3,
+      "fromPhase": "discover",
+      "type": "misweight",
+      "authority": "model",
+      "decision": "STRUCTURE.md で reconciler=Supporting を明示（コード削除なし）。",
+      "status": "done"
+    },
+    {
+      "id": 4,
+      "fromPhase": "discover",
+      "type": "naming",
+      "authority": "model",
+      "decision": "README/STRUCTURE 語彙是正済み（差分=intent↔structure、Core=検証、reconciler=Supporting）。",
+      "status": "done"
+    },
+    {
+      "id": 5,
+      "fromPhase": "storming",
+      "type": "duplication",
+      "authority": "converge",
+      "decision": "二重の adjudication+burn-in。【決定】別文脈で維持し統合しない（ユーザー判断）。共有は語彙レベルに留める。",
+      "status": "deferred"
+    },
+    {
+      "id": 6,
+      "fromPhase": "storming",
+      "type": "split",
+      "authority": "model",
+      "decision": "【着手(Option B)】Verification を独立 packages/verification として新設（unified 入力・後段）。loop-e2e の verify/explore/scenario/refute の behavior→verification 実移設と、behavior の観測のみ縮小は残。",
+      "status": "in-progress"
+    }
+  ]
+}

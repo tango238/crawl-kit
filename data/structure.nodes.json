@@ -1,0 +1,429 @@
+[
+  {
+    "nodeId": "structure:route/GET /orders",
+    "layer": "structure",
+    "localName": "GET /orders",
+    "raw": {
+      "kind": "route",
+      "method": "GET",
+      "path": "/orders",
+      "handler": "listOrders",
+      "source": "src/routes/orders.ts:12",
+      "entity": "orders",
+      "crud": [
+        "R"
+      ]
+    },
+    "route": "GET /orders",
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  },
+  {
+    "nodeId": "structure:route/GET /orders/:id",
+    "layer": "structure",
+    "localName": "GET /orders/:id",
+    "raw": {
+      "kind": "route",
+      "method": "GET",
+      "path": "/orders/:id",
+      "handler": "getOrder",
+      "source": "src/routes/orders.ts:20",
+      "entity": "orders",
+      "crud": [
+        "R"
+      ]
+    },
+    "route": "GET /orders/:id",
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  },
+  {
+    "nodeId": "structure:route/POST /orders",
+    "layer": "structure",
+    "localName": "POST /orders",
+    "raw": {
+      "kind": "route",
+      "method": "POST",
+      "path": "/orders",
+      "handler": "createOrder",
+      "source": "src/routes/orders.ts:31",
+      "entity": "orders",
+      "crud": [
+        "C"
+      ]
+    },
+    "route": "POST /orders",
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  },
+  {
+    "nodeId": "structure:route/GET /customers",
+    "layer": "structure",
+    "localName": "GET /customers",
+    "raw": {
+      "kind": "route",
+      "method": "GET",
+      "path": "/customers",
+      "handler": "listCustomers",
+      "source": "src/routes/customers.ts:8",
+      "entity": "customers",
+      "crud": [
+        "R"
+      ]
+    },
+    "route": "GET /customers",
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  },
+  {
+    "nodeId": "structure:route/GET /products",
+    "layer": "structure",
+    "localName": "GET /products",
+    "raw": {
+      "kind": "route",
+      "method": "GET",
+      "path": "/products",
+      "handler": "listProducts",
+      "source": "src/routes/products.ts:9",
+      "entity": "products",
+      "crud": [
+        "R"
+      ]
+    },
+    "route": "GET /products",
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  },
+  {
+    "nodeId": "structure:route/GET /products/:id",
+    "layer": "structure",
+    "localName": "GET /products/:id",
+    "raw": {
+      "kind": "route",
+      "method": "GET",
+      "path": "/products/:id",
+      "handler": "getProduct",
+      "source": "src/routes/products.ts:17",
+      "entity": "products",
+      "crud": [
+        "R"
+      ]
+    },
+    "route": "GET /products/:id",
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  },
+  {
+    "nodeId": "structure:route/POST /payments",
+    "layer": "structure",
+    "localName": "POST /payments",
+    "raw": {
+      "kind": "route",
+      "method": "POST",
+      "path": "/payments",
+      "handler": "createPayment",
+      "source": "src/routes/payments.ts:14",
+      "entity": "payments",
+      "crud": [
+        "C"
+      ]
+    },
+    "route": "POST /payments",
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  },
+  {
+    "nodeId": "structure:route/POST /shipments",
+    "layer": "structure",
+    "localName": "POST /shipments",
+    "raw": {
+      "kind": "route",
+      "method": "POST",
+      "path": "/shipments",
+      "handler": "createShipment",
+      "source": "src/routes/shipments.ts:11",
+      "entity": "shipments",
+      "crud": [
+        "C"
+      ]
+    },
+    "route": "POST /shipments",
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  },
+  {
+    "nodeId": "structure:route/POST /admin/reindex",
+    "layer": "structure",
+    "localName": "POST /admin/reindex",
+    "raw": {
+      "kind": "route",
+      "method": "POST",
+      "path": "/admin/reindex",
+      "handler": "reindex",
+      "source": "src/routes/admin.ts:5"
+    },
+    "route": "POST /admin/reindex",
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  },
+  {
+    "nodeId": "structure:entity/orders",
+    "layer": "structure",
+    "localName": "orders",
+    "raw": {
+      "kind": "entity",
+      "attributes": [
+        "id",
+        "customer_id",
+        "total",
+        "status",
+        "placed_at"
+      ],
+      "dependsOn": [
+        "customers"
+      ],
+      "crud": [
+        "C",
+        "R"
+      ]
+    },
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  },
+  {
+    "nodeId": "structure:entity/customers",
+    "layer": "structure",
+    "localName": "customers",
+    "raw": {
+      "kind": "entity",
+      "attributes": [
+        "id",
+        "name",
+        "email"
+      ],
+      "dependsOn": [],
+      "crud": [
+        "R"
+      ]
+    },
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  },
+  {
+    "nodeId": "structure:entity/products",
+    "layer": "structure",
+    "localName": "products",
+    "raw": {
+      "kind": "entity",
+      "attributes": [
+        "id",
+        "name",
+        "price",
+        "sku"
+      ],
+      "dependsOn": [],
+      "crud": [
+        "R"
+      ]
+    },
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  },
+  {
+    "nodeId": "structure:entity/payments",
+    "layer": "structure",
+    "localName": "payments",
+    "raw": {
+      "kind": "entity",
+      "attributes": [
+        "id",
+        "order_id",
+        "amount",
+        "method"
+      ],
+      "dependsOn": [
+        "orders",
+        "shipments"
+      ],
+      "crud": [
+        "C"
+      ]
+    },
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  },
+  {
+    "nodeId": "structure:entity/shipments",
+    "layer": "structure",
+    "localName": "shipments",
+    "raw": {
+      "kind": "entity",
+      "attributes": [
+        "id",
+        "order_id",
+        "address",
+        "carrier"
+      ],
+      "dependsOn": [
+        "orders"
+      ],
+      "crud": [
+        "C"
+      ]
+    },
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  },
+  {
+    "nodeId": "structure:entity/order_items",
+    "layer": "structure",
+    "localName": "order_items",
+    "raw": {
+      "kind": "entity",
+      "attributes": [
+        "id",
+        "order_id",
+        "product_id",
+        "qty"
+      ],
+      "dependsOn": [
+        "orders",
+        "products"
+      ],
+      "crud": []
+    },
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  },
+  {
+    "nodeId": "structure:entity/accounts",
+    "layer": "structure",
+    "localName": "accounts",
+    "raw": {
+      "kind": "entity",
+      "attributes": [
+        "id",
+        "customer_id",
+        "tier",
+        "active_since"
+      ],
+      "dependsOn": [
+        "customers"
+      ],
+      "crud": []
+    },
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  },
+  {
+    "nodeId": "structure:entity/clients",
+    "layer": "structure",
+    "localName": "clients",
+    "raw": {
+      "kind": "entity",
+      "attributes": [
+        "id",
+        "name",
+        "phone"
+      ],
+      "dependsOn": [],
+      "crud": []
+    },
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  },
+  {
+    "nodeId": "structure:entity/sessions",
+    "layer": "structure",
+    "localName": "sessions",
+    "raw": {
+      "kind": "entity",
+      "attributes": [
+        "id",
+        "user_id",
+        "token",
+        "expires_at"
+      ],
+      "dependsOn": [],
+      "crud": []
+    },
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  },
+  {
+    "nodeId": "structure:entity/outbox",
+    "layer": "structure",
+    "localName": "outbox",
+    "raw": {
+      "kind": "entity",
+      "attributes": [
+        "id",
+        "event_type",
+        "payload",
+        "published_at"
+      ],
+      "dependsOn": [],
+      "crud": []
+    },
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  },
+  {
+    "nodeId": "structure:entity/ab_tests",
+    "layer": "structure",
+    "localName": "ab_tests",
+    "raw": {
+      "kind": "entity",
+      "attributes": [
+        "id",
+        "experiment",
+        "variant",
+        "bucket"
+      ],
+      "dependsOn": [],
+      "crud": []
+    },
+    "source": {
+      "tool": "rdra-analyzer",
+      "runId": "structure-25636"
+    }
+  }
+]

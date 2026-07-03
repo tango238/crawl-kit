@@ -1,0 +1,40 @@
+{
+  "name": "@tanago3/crawl-kit",
+  "version": "0.2.0",
+  "description": "Tell whether the software you intended, built, and run are the same — one CLI over the crawl-kit spine.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "crawl-kit": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "samples"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node20 --banner:js=\"import { createRequire as __ckCreateRequire } from 'node:module'; const require = __ckCreateRequire(import.meta.url);\" --outfile=dist/index.js && mkdir -p dist/viewer-public && cp -R ../viewer/public/. dist/viewer-public/",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "start": "tsx src/index.ts"
+  },
+  "devDependencies": {
+    "@crawl-kit/contract": "workspace:*",
+    "@crawl-kit/intent": "workspace:*",
+    "@crawl-kit/structure": "workspace:*",
+    "@crawl-kit/reconciler": "workspace:*",
+    "@crawl-kit/verification": "workspace:*",
+    "@crawl-kit/viewer": "workspace:*",
+    "@crawl-kit/freshness": "workspace:*",
+    "@crawl-kit/behavior": "workspace:*",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.19.2",
+    "vitest": "^2.1.8",
+    "yaml": "^2.9.0"
+  }
+}

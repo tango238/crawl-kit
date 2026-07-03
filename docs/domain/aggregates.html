@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aggregates</title><style>:root{--bg:#0f172a;--card:#1e293b;--line:#334155;--txt:#e2e8f0;--muted:#94a3b8;--accent:#7dd3fc}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,'Hiragino Kaku Gothic ProN','Segoe UI',sans-serif;line-height:1.75}
+nav.top{position:sticky;top:0;z-index:10;background:#0b1220;border-bottom:1px solid var(--line);padding:10px 24px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+nav.top .brand{font-weight:700;font-size:14px;margin-right:12px;color:#fff}
+nav.top a{color:var(--muted);text-decoration:none;font-size:13px;padding:5px 11px;border-radius:7px;white-space:nowrap}
+nav.top a:hover{background:#172033;color:var(--txt)}
+nav.top a.active{background:#334155;color:#fff;font-weight:600}
+main{max-width:1000px;margin:0 auto;padding:32px 28px 96px}
+main img{max-width:100%;height:auto;border-radius:12px;border:1px solid var(--line);display:block;margin:18px auto}
+h1{font-size:26px;border-bottom:2px solid var(--line);padding-bottom:12px;margin-top:8px}
+h2{font-size:20px;border-bottom:1px solid var(--line);padding-bottom:7px;margin-top:38px}
+h3{font-size:16px;margin-top:28px;color:#cbd5e1}h4{font-size:14px;margin-top:20px;color:#cbd5e1}
+a{color:var(--accent)}p,li{font-size:14.5px}
+code{background:#0b1220;padding:2px 7px;border-radius:5px;font-size:13px;font-family:ui-monospace,Menlo,monospace}
+pre{background:#0b1220;border:1px solid var(--line);border-radius:10px;padding:16px;overflow:auto;font-size:12.5px;line-height:1.55}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;width:100%;margin:16px 0;font-size:13px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--card);font-weight:600}tr:nth-child(even) td{background:#172033}
+blockquote{border-left:4px solid #475569;margin:16px 0;padding:4px 18px;color:var(--muted);background:#131c2e;border-radius:0 8px 8px 0}
+hr{border:none;border-top:1px solid var(--line);margin:32px 0}
+ul,ol{padding-left:24px}li{margin:4px 0}strong{color:#f1f5f9}
+footer{max-width:1000px;margin:0 auto;padding:20px 28px 60px;color:var(--muted);font-size:12px;border-top:1px solid var(--line)}
+
+figure.jig-graph{margin:18px 0;background:#0b1220;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+figure.jig-graph .jig-toolbar{display:flex;gap:6px;justify-content:flex-end;padding:8px 10px;border-bottom:1px solid var(--line);background:#0d1526}
+figure.jig-graph .jig-toolbar button{background:#172033;color:var(--muted);border:1px solid var(--line);border-radius:6px;font-size:12px;padding:3px 9px;cursor:pointer}
+figure.jig-graph .jig-toolbar button:hover{background:#1e293b;color:var(--txt)}
+figure.jig-graph .jig-canvas{padding:16px;overflow:auto;text-align:center}
+figure.jig-graph .jig-canvas svg{max-width:100%;height:auto}
+figure.jig-graph .jig-fallback{background:none;border:none;text-align:left;color:var(--muted);margin:0}
+</style></head><body>
+<nav class="top"><span class="brand">crawl-kit ドメインモデル</span><a href="discovery.html">ディスカバリ</a><a href="event-storming.html">イベントストーミング</a><a href="bounded-contexts.html">境界づけられたコンテキスト</a><a href="context-map.html">コンテキストマップ</a><a href="aggregates.html" class="active">集約</a><a href="domain-events.html">ドメインイベント</a><a href="sync.html">モデル⇔実装 Sync</a></nav>
+<main>
+<h1 id="aggregates">Aggregates</h1>
+<blockquote>由来: <a href="./event-storming.html">event-storming.md</a> / <a href="./bounded-contexts.html">bounded-contexts.md</a>。<br>Core=Verification（検証＋裁定）を中心に、4ルール（不変条件を境界内 / 小さく / 他集約は ID 参照 / 結果整合）で右サイズ化。<br><strong>実装は OO メソッドでなく「型＋純関数」</strong>（loop-e2e/crawl-kit の関数型方針）。集約＝整合性境界、公開操作＝パイプライン関数。</blockquote>
+<h2 id="right-sizing">Right-Sizing の判断</h2>
+<table><thead><tr><th>候補</th><th>判断</th><th>理由（ルール）</th></tr></thead><tbody><tr><td>Finding ＋ Verdict</td><td><strong>同一集約</strong></td><td>検証と裁定を1 BC に統合（contexts 決定）。verdict は votes と<strong>即時整合</strong>が必要（R1）</td></tr><tr><td>Run と Finding</td><td><strong>分離</strong></td><td>1 Run に多数 Finding、Finding は独自ライフサイクル（産出→裁定→既知化）。R2 小さく / R3 RunId 参照</td></tr><tr><td>Finding と KnownFinding</td><td><strong>分離</strong></td><td>Convergence BC。抑制は次回 run で読む＝<strong>結果整合</strong>（R4）</td></tr><tr><td>Scenario</td><td><strong>分離</strong></td><td>Scenario Lifecycle BC。proposed/active の独自ライフサイクル</td></tr></tbody></table>
+<h2 id="">集約一覧</h2>
+<h3 id="verificationrun-bc-verification">VerificationRun（BC: Verification）</h3>
+<figure class="jig-graph" data-kind="agg-verificationrun-bc-verification-8662f75f">
+  <div class="jig-toolbar"><button type="button" data-act="dir" title="Switch direction">⇄</button><button type="button" data-act="svg" title="Download SVG">⬇ SVG</button><button type="button" data-act="src" title="Copy DOT source">⧉ DOT</button></div>
+  <script type="text/vnd.graphviz">digraph "agg_verificationrun-bc-verification-8662f75f" {
+  rankdir="LR";
+  bgcolor="transparent";
+  node [shape=box, style=filled, fontname="sans-serif", fontsize=12, fillcolor="#1e293b", color="#94a3b8", fontcolor="#e2e8f0", margin="0.18,0.10"];
+  edge [fontname="sans-serif", fontsize=10, color="#94a3b8", fontcolor="#cbd5e1"];
+  "agg_verificationrun-bc-verification-8662f75f" [label="VerificationRun（BC: Verification）", color="#f59e0b", penwidth="2.0", fillcolor="#1f2937"];
+  "cmd_startrun" [label="startRun", shape=cds, color="#3b82f6", fontcolor="#bfdbfe"];
+  "cmd_startrun" -> "agg_verificationrun-bc-verification-8662f75f" [color="#3b82f6"];
+  "cmd_completerun" [label="completeRun", shape=cds, color="#3b82f6", fontcolor="#bfdbfe"];
+  "cmd_completerun" -> "agg_verificationrun-bc-verification-8662f75f" [color="#3b82f6"];
+  "evt_runstarted" [label="RunStarted", shape=note, fillcolor="#422006", color="#f59e0b", fontcolor="#fde68a"];
+  "agg_verificationrun-bc-verification-8662f75f" -> "evt_runstarted" [color="#f59e0b"];
+  "evt_runcompleted" [label="RunCompleted", shape=note, fillcolor="#422006", color="#f59e0b", fontcolor="#fde68a"];
+  "agg_verificationrun-bc-verification-8662f75f" -> "evt_runcompleted" [color="#f59e0b"];
+}</script>
+  <div class="jig-canvas"><pre class="jig-fallback">digraph &quot;agg_verificationrun-bc-verification-8662f75f&quot; {
+  rankdir=&quot;LR&quot;;
+  bgcolor=&quot;transparent&quot;;
+  node [shape=box, style=filled, fontname=&quot;sans-serif&quot;, fontsize=12, fillcolor=&quot;#1e293b&quot;, color=&quot;#94a3b8&quot;, fontcolor=&quot;#e2e8f0&quot;, margin=&quot;0.18,0.10&quot;];
+  edge [fontname=&quot;sans-serif&quot;, fontsize=10, color=&quot;#94a3b8&quot;, fontcolor=&quot;#cbd5e1&quot;];
+  &quot;agg_verificationrun-bc-verification-8662f75f&quot; [label=&quot;VerificationRun（BC: Verification）&quot;, color=&quot;#f59e0b&quot;, penwidth=&quot;2.0&quot;, fillcolor=&quot;#1f2937&quot;];
+  &quot;cmd_startrun&quot; [label=&quot;startRun&quot;, shape=cds, color=&quot;#3b82f6&quot;, fontcolor=&quot;#bfdbfe&quot;];
+  &quot;cmd_startrun&quot; -&gt; &quot;agg_verificationrun-bc-verification-8662f75f&quot; [color=&quot;#3b82f6&quot;];
+  &quot;cmd_completerun&quot; [label=&quot;completeRun&quot;, shape=cds, color=&quot;#3b82f6&quot;, fontcolor=&quot;#bfdbfe&quot;];
+  &quot;cmd_completerun&quot; -&gt; &quot;agg_verificationrun-bc-verification-8662f75f&quot; [color=&quot;#3b82f6&quot;];
+  &quot;evt_runstarted&quot; [label=&quot;RunStarted&quot;, shape=note, fillcolor=&quot;#422006&quot;, color=&quot;#f59e0b&quot;, fontcolor=&quot;#fde68a&quot;];
+  &quot;agg_verificationrun-bc-verification-8662f75f&quot; -&gt; &quot;evt_runstarted&quot; [color=&quot;#f59e0b&quot;];
+  &quot;evt_runcompleted&quot; [label=&quot;RunCompleted&quot;, shape=note, fillcolor=&quot;#422006&quot;, color=&quot;#f59e0b&quot;, fontcolor=&quot;#fde68a&quot;];
+  &quot;agg_verificationrun-bc-verification-8662f75f&quot; -&gt; &quot;evt_runcompleted&quot; [color=&quot;#f59e0b&quot;];
+}</pre></div>
+</figure>
+<ul><li><strong>Root / ID</strong>: <code>VerificationRun</code> / <code>RunId</code></li><li><strong>構成</strong>: <code>UnifiedRef</code>(VO: 期待スナップショットの参照), <code>TargetRef</code>(VO), 実行ステータス</li><li><strong>不変条件</strong>: Run は<strong>ちょうど1つの Unified スナップショット</strong>を「期待」として参照する（検証の基準を固定）</li><li><strong>操作</strong>:<ul><li><code>startRun(unifiedRef, target)</code>: 検証開始 → 発行: <code>RunStarted</code></li><li><code>completeRun()</code>: 完了 → 発行: <code>RunCompleted</code></li></ul></li><li><strong>他集約参照</strong>: <code>UnifiedRef</code>(Reconciliation の Unified を ID 参照), Finding は RunId で逆参照</li><li><strong>整合性</strong>: 即時=自身のステータス／結果整合=Finding（Domain Event で産出）</li></ul>
+<h3 id="finding-bc-verification">Finding（BC: Verification）★検証の原子単位</h3>
+<figure class="jig-graph" data-kind="agg-finding-bc-verification-199349d7">
+  <div class="jig-toolbar"><button type="button" data-act="dir" title="Switch direction">⇄</button><button type="button" data-act="svg" title="Download SVG">⬇ SVG</button><button type="button" data-act="src" title="Copy DOT source">⧉ DOT</button></div>
+  <script type="text/vnd.graphviz">digraph "agg_finding-bc-verification-199349d7" {
+  rankdir="LR";
+  bgcolor="transparent";
+  node [shape=box, style=filled, fontname="sans-serif", fontsize=12, fillcolor="#1e293b", color="#94a3b8", fontcolor="#e2e8f0", margin="0.18,0.10"];
+  edge [fontname="sans-serif", fontsize=10, color="#94a3b8", fontcolor="#cbd5e1"];
+  "agg_finding-bc-verification-199349d7" [label="Finding（BC: Verification）★検証の原子単位", color="#f59e0b", penwidth="2.0", fillcolor="#1f2937"];
+  "cmd_produce" [label="produce", shape=cds, color="#3b82f6", fontcolor="#bfdbfe"];
+  "cmd_produce" -> "agg_finding-bc-verification-199349d7" [color="#3b82f6"];
+  "cmd_adjudicate" [label="adjudicate", shape=cds, color="#3b82f6", fontcolor="#bfdbfe"];
+  "cmd_adjudicate" -> "agg_finding-bc-verification-199349d7" [color="#3b82f6"];
+  "evt_findingproduced" [label="FindingProduced", shape=note, fillcolor="#422006", color="#f59e0b", fontcolor="#fde68a"];
+  "agg_finding-bc-verification-199349d7" -> "evt_findingproduced" [color="#f59e0b"];
+  "cons_convergence" [label="Convergence", color="#7dd3fc", style="filled,dashed", fontcolor="#bae6fd"];
+  "evt_findingproduced" -> "cons_convergence" [color="#7dd3fc", style="dashed"];
+  "evt_verdictreached" [label="VerdictReached", shape=note, fillcolor="#422006", color="#f59e0b", fontcolor="#fde68a"];
+  "agg_finding-bc-verification-199349d7" -> "evt_verdictreached" [color="#f59e0b"];
+  "cons_reporting" [label="Reporting", color="#7dd3fc", style="filled,dashed", fontcolor="#bae6fd"];
+  "evt_verdictreached" -> "cons_reporting" [color="#7dd3fc", style="dashed"];
+}</script>
+  <div class="jig-canvas"><pre class="jig-fallback">digraph &quot;agg_finding-bc-verification-199349d7&quot; {
+  rankdir=&quot;LR&quot;;
+  bgcolor=&quot;transparent&quot;;
+  node [shape=box, style=filled, fontname=&quot;sans-serif&quot;, fontsize=12, fillcolor=&quot;#1e293b&quot;, color=&quot;#94a3b8&quot;, fontcolor=&quot;#e2e8f0&quot;, margin=&quot;0.18,0.10&quot;];
+  edge [fontname=&quot;sans-serif&quot;, fontsize=10, color=&quot;#94a3b8&quot;, fontcolor=&quot;#cbd5e1&quot;];
+  &quot;agg_finding-bc-verification-199349d7&quot; [label=&quot;Finding（BC: Verification）★検証の原子単位&quot;, color=&quot;#f59e0b&quot;, penwidth=&quot;2.0&quot;, fillcolor=&quot;#1f2937&quot;];
+  &quot;cmd_produce&quot; [label=&quot;produce&quot;, shape=cds, color=&quot;#3b82f6&quot;, fontcolor=&quot;#bfdbfe&quot;];
+  &quot;cmd_produce&quot; -&gt; &quot;agg_finding-bc-verification-199349d7&quot; [color=&quot;#3b82f6&quot;];
+  &quot;cmd_adjudicate&quot; [label=&quot;adjudicate&quot;, shape=cds, color=&quot;#3b82f6&quot;, fontcolor=&quot;#bfdbfe&quot;];
+  &quot;cmd_adjudicate&quot; -&gt; &quot;agg_finding-bc-verification-199349d7&quot; [color=&quot;#3b82f6&quot;];
+  &quot;evt_findingproduced&quot; [label=&quot;FindingProduced&quot;, shape=note, fillcolor=&quot;#422006&quot;, color=&quot;#f59e0b&quot;, fontcolor=&quot;#fde68a&quot;];
+  &quot;agg_finding-bc-verification-199349d7&quot; -&gt; &quot;evt_findingproduced&quot; [color=&quot;#f59e0b&quot;];
+  &quot;cons_convergence&quot; [label=&quot;Convergence&quot;, color=&quot;#7dd3fc&quot;, style=&quot;filled,dashed&quot;, fontcolor=&quot;#bae6fd&quot;];
+  &quot;evt_findingproduced&quot; -&gt; &quot;cons_convergence&quot; [color=&quot;#7dd3fc&quot;, style=&quot;dashed&quot;];
+  &quot;evt_verdictreached&quot; [label=&quot;VerdictReached&quot;, shape=note, fillcolor=&quot;#422006&quot;, color=&quot;#f59e0b&quot;, fontcolor=&quot;#fde68a&quot;];
+  &quot;agg_finding-bc-verification-199349d7&quot; -&gt; &quot;evt_verdictreached&quot; [color=&quot;#f59e0b&quot;];
+  &quot;cons_reporting&quot; [label=&quot;Reporting&quot;, color=&quot;#7dd3fc&quot;, style=&quot;filled,dashed&quot;, fontcolor=&quot;#bae6fd&quot;];
+  &quot;evt_verdictreached&quot; -&gt; &quot;cons_reporting&quot; [color=&quot;#7dd3fc&quot;, style=&quot;dashed&quot;];
+}</pre></div>
+</figure>
+<ul><li><strong>Root / ID</strong>: <code>Finding</code> / <code>FindingId</code>（＋ <code>Fingerprint</code> VO = 既知化の同一性キー）</li><li><strong>構成</strong>:<ul><li><code>Discrepancy</code>(VO): kind(diff/verify)・category(6種)・severity・expected・actual・evidence</li><li><code>Verdict</code>(内包): <code>RefuterVote[]</code>(3レンズ: correctness/security/intentionality)・classification(bug/unnecessary/uncertain)・confidence・confirmedCount/panelSize</li></ul></li><li><strong>不変条件</strong>（R1: votes と verdict を同一境界で守る）:<ul><li><code>verdict.classification</code> は <code>votes</code> から導出（多数決: confirmedCount ≥ 過半 → bug）。<strong>votes 無しに classification を立てられない</strong></li><li><code>confidence ∈ [0,1]</code>、<code>confirmedCount ≤ panelSize</code></li><li><code>RunId</code> を必ず持つ（R3: 親 Run を ID 参照）</li></ul></li><li><strong>操作</strong>:<ul><li><code>produce(discrepancy, runId)</code>: 食い違いを Finding 化 → 発行: <code>FindingProduced</code></li><li><code>adjudicate(votes)</code>: 反証パネルで裁定 → 発行: <code>VerdictReached</code></li></ul></li><li><strong>他集約参照</strong>: <code>RunId</code>、必要なら <code>ConceptId</code>(unified の概念) を ID 参照</li><li><strong>整合性</strong>: 即時=Discrepancy＋Verdict（同一集約）／結果整合=KnownFinding（Fingerprint で抑制）</li></ul>
+<h3 id="scenario-bc-scenario-lifecycle">Scenario（BC: Scenario Lifecycle）</h3>
+<figure class="jig-graph" data-kind="agg-scenario-bc-scenario-lifecycle-371b1be8">
+  <div class="jig-toolbar"><button type="button" data-act="dir" title="Switch direction">⇄</button><button type="button" data-act="svg" title="Download SVG">⬇ SVG</button><button type="button" data-act="src" title="Copy DOT source">⧉ DOT</button></div>
+  <script type="text/vnd.graphviz">digraph "agg_scenario-bc-scenario-lifecycle-371b1be8" {
+  rankdir="LR";
+  bgcolor="transparent";
+  node [shape=box, style=filled, fontname="sans-serif", fontsize=12, fillcolor="#1e293b", color="#94a3b8", fontcolor="#e2e8f0", margin="0.18,0.10"];
+  edge [fontname="sans-serif", fontsize=10, color="#94a3b8", fontcolor="#cbd5e1"];
+  "agg_scenario-bc-scenario-lifecycle-371b1be8" [label="Scenario（BC: Scenario Lifecycle）", color="#f59e0b", penwidth="2.0", fillcolor="#1f2937"];
+  "cmd_propose" [label="propose", shape=cds, color="#3b82f6", fontcolor="#bfdbfe"];
+  "cmd_propose" -> "agg_scenario-bc-scenario-lifecycle-371b1be8" [color="#3b82f6"];
+  "cmd_approve" [label="approve", shape=cds, color="#3b82f6", fontcolor="#bfdbfe"];
+  "cmd_approve" -> "agg_scenario-bc-scenario-lifecycle-371b1be8" [color="#3b82f6"];
+  "evt_scenariosproposed" [label="ScenariosProposed", shape=note, fillcolor="#422006", color="#f59e0b", fontcolor="#fde68a"];
+  "agg_scenario-bc-scenario-lifecycle-371b1be8" -> "evt_scenariosproposed" [color="#f59e0b"];
+  "evt_scenarioapproved" [label="ScenarioApproved", shape=note, fillcolor="#422006", color="#f59e0b", fontcolor="#fde68a"];
+  "agg_scenario-bc-scenario-lifecycle-371b1be8" -> "evt_scenarioapproved" [color="#f59e0b"];
+  "cons_verification" [label="Verification", color="#7dd3fc", style="filled,dashed", fontcolor="#bae6fd"];
+  "evt_scenarioapproved" -> "cons_verification" [color="#7dd3fc", style="dashed"];
+}</script>
+  <div class="jig-canvas"><pre class="jig-fallback">digraph &quot;agg_scenario-bc-scenario-lifecycle-371b1be8&quot; {
+  rankdir=&quot;LR&quot;;
+  bgcolor=&quot;transparent&quot;;
+  node [shape=box, style=filled, fontname=&quot;sans-serif&quot;, fontsize=12, fillcolor=&quot;#1e293b&quot;, color=&quot;#94a3b8&quot;, fontcolor=&quot;#e2e8f0&quot;, margin=&quot;0.18,0.10&quot;];
+  edge [fontname=&quot;sans-serif&quot;, fontsize=10, color=&quot;#94a3b8&quot;, fontcolor=&quot;#cbd5e1&quot;];
+  &quot;agg_scenario-bc-scenario-lifecycle-371b1be8&quot; [label=&quot;Scenario（BC: Scenario Lifecycle）&quot;, color=&quot;#f59e0b&quot;, penwidth=&quot;2.0&quot;, fillcolor=&quot;#1f2937&quot;];
+  &quot;cmd_propose&quot; [label=&quot;propose&quot;, shape=cds, color=&quot;#3b82f6&quot;, fontcolor=&quot;#bfdbfe&quot;];
+  &quot;cmd_propose&quot; -&gt; &quot;agg_scenario-bc-scenario-lifecycle-371b1be8&quot; [color=&quot;#3b82f6&quot;];
+  &quot;cmd_approve&quot; [label=&quot;approve&quot;, shape=cds, color=&quot;#3b82f6&quot;, fontcolor=&quot;#bfdbfe&quot;];
+  &quot;cmd_approve&quot; -&gt; &quot;agg_scenario-bc-scenario-lifecycle-371b1be8&quot; [color=&quot;#3b82f6&quot;];
+  &quot;evt_scenariosproposed&quot; [label=&quot;ScenariosProposed&quot;, shape=note, fillcolor=&quot;#422006&quot;, color=&quot;#f59e0b&quot;, fontcolor=&quot;#fde68a&quot;];
+  &quot;agg_scenario-bc-scenario-lifecycle-371b1be8&quot; -&gt; &quot;evt_scenariosproposed&quot; [color=&quot;#f59e0b&quot;];
+  &quot;evt_scenarioapproved&quot; [label=&quot;ScenarioApproved&quot;, shape=note, fillcolor=&quot;#422006&quot;, color=&quot;#f59e0b&quot;, fontcolor=&quot;#fde68a&quot;];
+  &quot;agg_scenario-bc-scenario-lifecycle-371b1be8&quot; -&gt; &quot;evt_scenarioapproved&quot; [color=&quot;#f59e0b&quot;];
+  &quot;cons_verification&quot; [label=&quot;Verification&quot;, color=&quot;#7dd3fc&quot;, style=&quot;filled,dashed&quot;, fontcolor=&quot;#bae6fd&quot;];
+  &quot;evt_scenarioapproved&quot; -&gt; &quot;cons_verification&quot; [color=&quot;#7dd3fc&quot;, style=&quot;dashed&quot;];
+}</pre></div>
+</figure>
+<ul><li><strong>Root / ID</strong>: <code>Scenario</code> / <code>ScenarioId</code></li><li><strong>構成</strong>: <code>Step[]</code>(VO: action/target/value/expect), <code>status</code>(proposed/active), <code>Coverage</code>(VO)</li><li><strong>不変条件</strong>: <code>active</code> は approve 済み、<code>steps</code> 非空</li><li><strong>操作</strong>:<ul><li><code>propose()</code>: 草案を出す → 発行: <code>ScenariosProposed</code></li><li><code>approve()</code>: active へ昇格 → 発行: <code>ScenarioApproved</code></li></ul></li><li><strong>整合性</strong>: 即時=自身</li></ul>
+<h3 id="knownfinding-bc-convergence">KnownFinding（BC: Convergence）</h3>
+<figure class="jig-graph" data-kind="agg-knownfinding-bc-convergence-4c7e1dbf">
+  <div class="jig-toolbar"><button type="button" data-act="dir" title="Switch direction">⇄</button><button type="button" data-act="svg" title="Download SVG">⬇ SVG</button><button type="button" data-act="src" title="Copy DOT source">⧉ DOT</button></div>
+  <script type="text/vnd.graphviz">digraph "agg_knownfinding-bc-convergence-4c7e1dbf" {
+  rankdir="LR";
+  bgcolor="transparent";
+  node [shape=box, style=filled, fontname="sans-serif", fontsize=12, fillcolor="#1e293b", color="#94a3b8", fontcolor="#e2e8f0", margin="0.18,0.10"];
+  edge [fontname="sans-serif", fontsize=10, color="#94a3b8", fontcolor="#cbd5e1"];
+  "agg_knownfinding-bc-convergence-4c7e1dbf" [label="KnownFinding（BC: Convergence）", color="#f59e0b", penwidth="2.0", fillcolor="#1f2937"];
+  "cmd_record" [label="record", shape=cds, color="#3b82f6", fontcolor="#bfdbfe"];
+  "cmd_record" -> "agg_knownfinding-bc-convergence-4c7e1dbf" [color="#3b82f6"];
+  "evt_knownstateupdated" [label="KnownStateUpdated", shape=note, fillcolor="#422006", color="#f59e0b", fontcolor="#fde68a"];
+  "agg_knownfinding-bc-convergence-4c7e1dbf" -> "evt_knownstateupdated" [color="#f59e0b"];
+  "cons_verification" [label="Verification", color="#7dd3fc", style="filled,dashed", fontcolor="#bae6fd"];
+  "evt_knownstateupdated" -> "cons_verification" [color="#7dd3fc", style="dashed"];
+}</script>
+  <div class="jig-canvas"><pre class="jig-fallback">digraph &quot;agg_knownfinding-bc-convergence-4c7e1dbf&quot; {
+  rankdir=&quot;LR&quot;;
+  bgcolor=&quot;transparent&quot;;
+  node [shape=box, style=filled, fontname=&quot;sans-serif&quot;, fontsize=12, fillcolor=&quot;#1e293b&quot;, color=&quot;#94a3b8&quot;, fontcolor=&quot;#e2e8f0&quot;, margin=&quot;0.18,0.10&quot;];
+  edge [fontname=&quot;sans-serif&quot;, fontsize=10, color=&quot;#94a3b8&quot;, fontcolor=&quot;#cbd5e1&quot;];
+  &quot;agg_knownfinding-bc-convergence-4c7e1dbf&quot; [label=&quot;KnownFinding（BC: Convergence）&quot;, color=&quot;#f59e0b&quot;, penwidth=&quot;2.0&quot;, fillcolor=&quot;#1f2937&quot;];
+  &quot;cmd_record&quot; [label=&quot;record&quot;, shape=cds, color=&quot;#3b82f6&quot;, fontcolor=&quot;#bfdbfe&quot;];
+  &quot;cmd_record&quot; -&gt; &quot;agg_knownfinding-bc-convergence-4c7e1dbf&quot; [color=&quot;#3b82f6&quot;];
+  &quot;evt_knownstateupdated&quot; [label=&quot;KnownStateUpdated&quot;, shape=note, fillcolor=&quot;#422006&quot;, color=&quot;#f59e0b&quot;, fontcolor=&quot;#fde68a&quot;];
+  &quot;agg_knownfinding-bc-convergence-4c7e1dbf&quot; -&gt; &quot;evt_knownstateupdated&quot; [color=&quot;#f59e0b&quot;];
+  &quot;cons_verification&quot; [label=&quot;Verification&quot;, color=&quot;#7dd3fc&quot;, style=&quot;filled,dashed&quot;, fontcolor=&quot;#bae6fd&quot;];
+  &quot;evt_knownstateupdated&quot; -&gt; &quot;cons_verification&quot; [color=&quot;#7dd3fc&quot;, style=&quot;dashed&quot;];
+}</pre></div>
+</figure>
+<ul><li><strong>Root / ID</strong>: <code>KnownFinding</code> / <code>Fingerprint</code></li><li><strong>構成</strong>: <code>reason</code>, <code>by</code>, <code>recordedAt</code></li><li><strong>不変条件</strong>: 同一 <code>Fingerprint</code> の Finding を抑制する（既知＝再浮上しない）</li><li><strong>操作</strong>:<ul><li><code>record(fingerprint, reason, by)</code>: 既知化を焼き込む → 発行: <code>KnownStateUpdated</code></li></ul></li><li><strong>他集約参照</strong>: Finding を <code>Fingerprint</code> で参照（R3）</li><li><strong>整合性</strong>: 結果整合（Verification が次回 run で読む。R4）</li></ul>
+<h3 id="feedback-bc-convergence">Feedback（BC: Convergence）</h3>
+<figure class="jig-graph" data-kind="agg-feedback-bc-convergence-08f29a96">
+  <div class="jig-toolbar"><button type="button" data-act="dir" title="Switch direction">⇄</button><button type="button" data-act="svg" title="Download SVG">⬇ SVG</button><button type="button" data-act="src" title="Copy DOT source">⧉ DOT</button></div>
+  <script type="text/vnd.graphviz">digraph "agg_feedback-bc-convergence-08f29a96" {
+  rankdir="LR";
+  bgcolor="transparent";
+  node [shape=box, style=filled, fontname="sans-serif", fontsize=12, fillcolor="#1e293b", color="#94a3b8", fontcolor="#e2e8f0", margin="0.18,0.10"];
+  edge [fontname="sans-serif", fontsize=10, color="#94a3b8", fontcolor="#cbd5e1"];
+  "agg_feedback-bc-convergence-08f29a96" [label="Feedback（BC: Convergence）", color="#f59e0b", penwidth="2.0", fillcolor="#1f2937"];
+  "cmd_submit" [label="submit", shape=cds, color="#3b82f6", fontcolor="#bfdbfe"];
+  "cmd_submit" -> "agg_feedback-bc-convergence-08f29a96" [color="#3b82f6"];
+  "cmd_verify" [label="verify", shape=cds, color="#3b82f6", fontcolor="#bfdbfe"];
+  "cmd_verify" -> "agg_feedback-bc-convergence-08f29a96" [color="#3b82f6"];
+  "evt_feedbacksubmitted" [label="FeedbackSubmitted", shape=note, fillcolor="#422006", color="#f59e0b", fontcolor="#fde68a"];
+  "agg_feedback-bc-convergence-08f29a96" -> "evt_feedbacksubmitted" [color="#f59e0b"];
+  "evt_feedbackverified" [label="FeedbackVerified", shape=note, fillcolor="#422006", color="#f59e0b", fontcolor="#fde68a"];
+  "agg_feedback-bc-convergence-08f29a96" -> "evt_feedbackverified" [color="#f59e0b"];
+}</script>
+  <div class="jig-canvas"><pre class="jig-fallback">digraph &quot;agg_feedback-bc-convergence-08f29a96&quot; {
+  rankdir=&quot;LR&quot;;
+  bgcolor=&quot;transparent&quot;;
+  node [shape=box, style=filled, fontname=&quot;sans-serif&quot;, fontsize=12, fillcolor=&quot;#1e293b&quot;, color=&quot;#94a3b8&quot;, fontcolor=&quot;#e2e8f0&quot;, margin=&quot;0.18,0.10&quot;];
+  edge [fontname=&quot;sans-serif&quot;, fontsize=10, color=&quot;#94a3b8&quot;, fontcolor=&quot;#cbd5e1&quot;];
+  &quot;agg_feedback-bc-convergence-08f29a96&quot; [label=&quot;Feedback（BC: Convergence）&quot;, color=&quot;#f59e0b&quot;, penwidth=&quot;2.0&quot;, fillcolor=&quot;#1f2937&quot;];
+  &quot;cmd_submit&quot; [label=&quot;submit&quot;, shape=cds, color=&quot;#3b82f6&quot;, fontcolor=&quot;#bfdbfe&quot;];
+  &quot;cmd_submit&quot; -&gt; &quot;agg_feedback-bc-convergence-08f29a96&quot; [color=&quot;#3b82f6&quot;];
+  &quot;cmd_verify&quot; [label=&quot;verify&quot;, shape=cds, color=&quot;#3b82f6&quot;, fontcolor=&quot;#bfdbfe&quot;];
+  &quot;cmd_verify&quot; -&gt; &quot;agg_feedback-bc-convergence-08f29a96&quot; [color=&quot;#3b82f6&quot;];
+  &quot;evt_feedbacksubmitted&quot; [label=&quot;FeedbackSubmitted&quot;, shape=note, fillcolor=&quot;#422006&quot;, color=&quot;#f59e0b&quot;, fontcolor=&quot;#fde68a&quot;];
+  &quot;agg_feedback-bc-convergence-08f29a96&quot; -&gt; &quot;evt_feedbacksubmitted&quot; [color=&quot;#f59e0b&quot;];
+  &quot;evt_feedbackverified&quot; [label=&quot;FeedbackVerified&quot;, shape=note, fillcolor=&quot;#422006&quot;, color=&quot;#f59e0b&quot;, fontcolor=&quot;#fde68a&quot;];
+  &quot;agg_feedback-bc-convergence-08f29a96&quot; -&gt; &quot;evt_feedbackverified&quot; [color=&quot;#f59e0b&quot;];
+}</pre></div>
+</figure>
+<ul><li><strong>Root / ID</strong>: <code>Feedback</code> / <code>FeedbackId</code></li><li><strong>構成</strong>: <code>targetFindingId</code>(ID参照), <code>userComment</code>, <code>verdict</code>(valid/invalid), <code>appliedTo</code>(ScenarioId[])</li><li><strong>操作</strong>:<ul><li><code>submit()</code>: 指摘を提出 → 発行: <code>FeedbackSubmitted</code></li><li><code>verify()</code>: valid/invalid を判定 → 発行: <code>FeedbackVerified</code></li></ul></li><li><strong>他集約参照</strong>: <code>FindingId</code> / <code>ScenarioId</code>（R3）</li></ul>
+<h3 id="sitestructure-bc-observation">SiteStructure（BC: Observation）</h3>
+<figure class="jig-graph" data-kind="agg-sitestructure-bc-observation-f78ccbc1">
+  <div class="jig-toolbar"><button type="button" data-act="dir" title="Switch direction">⇄</button><button type="button" data-act="svg" title="Download SVG">⬇ SVG</button><button type="button" data-act="src" title="Copy DOT source">⧉ DOT</button></div>
+  <script type="text/vnd.graphviz">digraph "agg_sitestructure-bc-observation-f78ccbc1" {
+  rankdir="LR";
+  bgcolor="transparent";
+  node [shape=box, style=filled, fontname="sans-serif", fontsize=12, fillcolor="#1e293b", color="#94a3b8", fontcolor="#e2e8f0", margin="0.18,0.10"];
+  edge [fontname="sans-serif", fontsize=10, color="#94a3b8", fontcolor="#cbd5e1"];
+  "agg_sitestructure-bc-observation-f78ccbc1" [label="SiteStructure（BC: Observation）", color="#f59e0b", penwidth="2.0", fillcolor="#1f2937"];
+  "cmd_capture" [label="capture", shape=cds, color="#3b82f6", fontcolor="#bfdbfe"];
+  "cmd_capture" -> "agg_sitestructure-bc-observation-f78ccbc1" [color="#3b82f6"];
+  "cmd_extract" [label="extract", shape=cds, color="#3b82f6", fontcolor="#bfdbfe"];
+  "cmd_extract" -> "agg_sitestructure-bc-observation-f78ccbc1" [color="#3b82f6"];
+  "evt_appcrawled" [label="AppCrawled", shape=note, fillcolor="#422006", color="#f59e0b", fontcolor="#fde68a"];
+  "agg_sitestructure-bc-observation-f78ccbc1" -> "evt_appcrawled" [color="#f59e0b"];
+  "cons_observation" [label="Observation", color="#7dd3fc", style="filled,dashed", fontcolor="#bae6fd"];
+  "evt_appcrawled" -> "cons_observation" [color="#7dd3fc", style="dashed"];
+  "evt_sitestructureextracted" [label="SiteStructureExtracted", shape=note, fillcolor="#422006", color="#f59e0b", fontcolor="#fde68a"];
+  "agg_sitestructure-bc-observation-f78ccbc1" -> "evt_sitestructureextracted" [color="#f59e0b"];
+  "cons_observation" [label="Observation", color="#7dd3fc", style="filled,dashed", fontcolor="#bae6fd"];
+  "evt_sitestructureextracted" -> "cons_observation" [color="#7dd3fc", style="dashed"];
+}</script>
+  <div class="jig-canvas"><pre class="jig-fallback">digraph &quot;agg_sitestructure-bc-observation-f78ccbc1&quot; {
+  rankdir=&quot;LR&quot;;
+  bgcolor=&quot;transparent&quot;;
+  node [shape=box, style=filled, fontname=&quot;sans-serif&quot;, fontsize=12, fillcolor=&quot;#1e293b&quot;, color=&quot;#94a3b8&quot;, fontcolor=&quot;#e2e8f0&quot;, margin=&quot;0.18,0.10&quot;];
+  edge [fontname=&quot;sans-serif&quot;, fontsize=10, color=&quot;#94a3b8&quot;, fontcolor=&quot;#cbd5e1&quot;];
+  &quot;agg_sitestructure-bc-observation-f78ccbc1&quot; [label=&quot;SiteStructure（BC: Observation）&quot;, color=&quot;#f59e0b&quot;, penwidth=&quot;2.0&quot;, fillcolor=&quot;#1f2937&quot;];
+  &quot;cmd_capture&quot; [label=&quot;capture&quot;, shape=cds, color=&quot;#3b82f6&quot;, fontcolor=&quot;#bfdbfe&quot;];
+  &quot;cmd_capture&quot; -&gt; &quot;agg_sitestructure-bc-observation-f78ccbc1&quot; [color=&quot;#3b82f6&quot;];
+  &quot;cmd_extract&quot; [label=&quot;extract&quot;, shape=cds, color=&quot;#3b82f6&quot;, fontcolor=&quot;#bfdbfe&quot;];
+  &quot;cmd_extract&quot; -&gt; &quot;agg_sitestructure-bc-observation-f78ccbc1&quot; [color=&quot;#3b82f6&quot;];
+  &quot;evt_appcrawled&quot; [label=&quot;AppCrawled&quot;, shape=note, fillcolor=&quot;#422006&quot;, color=&quot;#f59e0b&quot;, fontcolor=&quot;#fde68a&quot;];
+  &quot;agg_sitestructure-bc-observation-f78ccbc1&quot; -&gt; &quot;evt_appcrawled&quot; [color=&quot;#f59e0b&quot;];
+  &quot;cons_observation&quot; [label=&quot;Observation&quot;, color=&quot;#7dd3fc&quot;, style=&quot;filled,dashed&quot;, fontcolor=&quot;#bae6fd&quot;];
+  &quot;evt_appcrawled&quot; -&gt; &quot;cons_observation&quot; [color=&quot;#7dd3fc&quot;, style=&quot;dashed&quot;];
+  &quot;evt_sitestructureextracted&quot; [label=&quot;SiteStructureExtracted&quot;, shape=note, fillcolor=&quot;#422006&quot;, color=&quot;#f59e0b&quot;, fontcolor=&quot;#fde68a&quot;];
+  &quot;agg_sitestructure-bc-observation-f78ccbc1&quot; -&gt; &quot;evt_sitestructureextracted&quot; [color=&quot;#f59e0b&quot;];
+  &quot;cons_observation&quot; [label=&quot;Observation&quot;, color=&quot;#7dd3fc&quot;, style=&quot;filled,dashed&quot;, fontcolor=&quot;#bae6fd&quot;];
+  &quot;evt_sitestructureextracted&quot; -&gt; &quot;cons_observation&quot; [color=&quot;#7dd3fc&quot;, style=&quot;dashed&quot;];
+}</pre></div>
+</figure>
+<ul><li><strong>Root / ID</strong>: <code>SiteStructure</code> / <code>(runId, generatedAt)</code></li><li><strong>構成</strong>: <code>PageInfo[]</code>(VO: url/title/displayItems/inputItems/expectations/capabilities), <code>Transition[]</code>(VO)</li><li><strong>不変条件</strong>: 各 Page は URL を持つ</li><li><strong>操作</strong>:<ul><li><code>capture(crawl)</code>: クロールして収集 → 発行: <code>AppCrawled</code></li><li><code>extract(llm)</code>: ページを構造化 → 発行: <code>SiteStructureExtracted</code></li></ul></li><li><strong>整合性</strong>: 即時=自身（observe のみ。判定はしない）</li></ul>
+<h3 id="concept-registry-bc-reconciliation-contract">Concept / Registry（BC: Reconciliation）※既存 contract</h3>
+<ul><li><strong>Root / ID</strong>: <code>Concept</code> / <code>ConceptId</code>、整合境界の親=<code>Registry</code></li><li><strong>構成</strong>: aliases, kind, nodes(層→NodeId[]), <code>ConceptState</code>, decisions(AdrId[]), resolution</li><li><strong>不変条件</strong>: 参照整合（dangling な ConceptId/AdrId 禁止）。<code>Registry</code> 書込はゲートを通る</li><li><strong>note</strong>: ここの <code>Verdict 相当 = ConceptState</code>（「同一概念か」）。Verification の Verdict（「バグか」）とは別概念（別 BC）</li></ul>
+<h2 id="anemic-analyze">Anemic チェック（--analyze 観察）</h2>
+<p>移植した loop-e2e は <strong>関数型</strong>（<code>domain/types.ts</code> の型＋pipeline の純関数）で、OO のメソッド付き集約ではない。 これは「貧血ドメイン」ではなく<strong>意図的な関数型設計</strong>（DMMF）。集約の「公開操作」は pipeline 関数として実現される（types フェーズで <code>Result&lt;Ok,Err&gt;</code> 型として固める）。</p>
+<h2 id="">未解決の問い</h2>
+<ul><li><code>Finding</code> の <code>Verdict</code> を内包（即時整合）で確定だが、<strong>反証 votes の取得は LLM 非同期</strong>。集約には「裁定済み votes」を渡し、取得自体は外側（関数引数）に置く（R: 依存は引数渡し）。</li><li><code>Fingerprint</code> の算出規則（何で同一とみなすか）— category＋location＋正規化シグネチャ？ events/types で固める。</li><li>Reconciliation と Convergence の burn-in を共有 VO（<code>BurnIn&lt;Decision&gt;</code>）にするか（語彙は別のまま）。</li></ul>
+</main>
+<footer>crawl-kit ドメインモデル &nbsp;|&nbsp; source: <code>docs/domain/aggregates.md</code> &nbsp;|&nbsp; generated by /ddd publish</footer>
+<script src="./_assets/viz-standalone.js"></script>
+<script>
+(function(){
+  var graphs=document.querySelectorAll('figure.jig-graph');
+  if(!graphs.length) return;
+  // Copy-DOT works without the renderer, so bind it unconditionally (the
+  // documented graceful-degradation path when viz-standalone.js is absent).
+  graphs.forEach(function(g){
+    var node=g.querySelector('script[type="text/vnd.graphviz"]');
+    if(!node) return;
+    var src=node.textContent, b=g.querySelector('[data-act=src]');
+    if(b) b.onclick=function(){ if(navigator.clipboard) navigator.clipboard.writeText(src); };
+  });
+  if(!(window.Viz&&window.Viz.instance)) return;  // no renderer: keep DOT fallback
+  window.Viz.instance().then(function(viz){
+    graphs.forEach(function(g){
+      var node=g.querySelector('script[type="text/vnd.graphviz"]');
+      if(!node) return;
+      var src=node.textContent, dir='LR', canvas=g.querySelector('.jig-canvas');
+      function render(){
+        var dot=src.replace(/rankdir\s*=\s*"?(LR|TB)"?/,'rankdir="'+dir+'"');
+        try{var svg=viz.renderSVGElement(dot);canvas.innerHTML='';canvas.appendChild(svg);}
+        catch(e){/* keep fallback */}
+      }
+      render();
+      var b;
+      if((b=g.querySelector('[data-act=dir]'))) b.onclick=function(){dir=(dir==='LR'?'TB':'LR');render();};
+      if((b=g.querySelector('[data-act=svg]'))) b.onclick=function(){
+        var s=canvas.querySelector('svg'); if(!s) return;
+        var blob=new Blob([s.outerHTML],{type:'image/svg+xml'});
+        var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+        a.download=(g.dataset.kind||'diagram')+'.svg';document.body.appendChild(a);a.click();a.remove();
+      };
+    });
+  });
+})();
+</script>
+</body></html>

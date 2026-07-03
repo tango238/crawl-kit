@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Model ⇔ Implementation Sync</title><style>:root{--bg:#0f172a;--card:#1e293b;--line:#334155;--txt:#e2e8f0;--muted:#94a3b8;--accent:#7dd3fc}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,'Hiragino Kaku Gothic ProN','Segoe UI',sans-serif;line-height:1.75}
+nav.top{position:sticky;top:0;z-index:10;background:#0b1220;border-bottom:1px solid var(--line);padding:10px 24px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+nav.top .brand{font-weight:700;font-size:14px;margin-right:12px;color:#fff}
+nav.top a{color:var(--muted);text-decoration:none;font-size:13px;padding:5px 11px;border-radius:7px;white-space:nowrap}
+nav.top a:hover{background:#172033;color:var(--txt)}
+nav.top a.active{background:#334155;color:#fff;font-weight:600}
+main{max-width:1000px;margin:0 auto;padding:32px 28px 96px}
+main img{max-width:100%;height:auto;border-radius:12px;border:1px solid var(--line);display:block;margin:18px auto}
+h1{font-size:26px;border-bottom:2px solid var(--line);padding-bottom:12px;margin-top:8px}
+h2{font-size:20px;border-bottom:1px solid var(--line);padding-bottom:7px;margin-top:38px}
+h3{font-size:16px;margin-top:28px;color:#cbd5e1}h4{font-size:14px;margin-top:20px;color:#cbd5e1}
+a{color:var(--accent)}p,li{font-size:14.5px}
+code{background:#0b1220;padding:2px 7px;border-radius:5px;font-size:13px;font-family:ui-monospace,Menlo,monospace}
+pre{background:#0b1220;border:1px solid var(--line);border-radius:10px;padding:16px;overflow:auto;font-size:12.5px;line-height:1.55}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;width:100%;margin:16px 0;font-size:13px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--card);font-weight:600}tr:nth-child(even) td{background:#172033}
+blockquote{border-left:4px solid #475569;margin:16px 0;padding:4px 18px;color:var(--muted);background:#131c2e;border-radius:0 8px 8px 0}
+hr{border:none;border-top:1px solid var(--line);margin:32px 0}
+ul,ol{padding-left:24px}li{margin:4px 0}strong{color:#f1f5f9}
+footer{max-width:1000px;margin:0 auto;padding:20px 28px 60px;color:var(--muted);font-size:12px;border-top:1px solid var(--line)}
+
+figure.jig-graph{margin:18px 0;background:#0b1220;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+figure.jig-graph .jig-toolbar{display:flex;gap:6px;justify-content:flex-end;padding:8px 10px;border-bottom:1px solid var(--line);background:#0d1526}
+figure.jig-graph .jig-toolbar button{background:#172033;color:var(--muted);border:1px solid var(--line);border-radius:6px;font-size:12px;padding:3px 9px;cursor:pointer}
+figure.jig-graph .jig-toolbar button:hover{background:#1e293b;color:var(--txt)}
+figure.jig-graph .jig-canvas{padding:16px;overflow:auto;text-align:center}
+figure.jig-graph .jig-canvas svg{max-width:100%;height:auto}
+figure.jig-graph .jig-fallback{background:none;border:none;text-align:left;color:var(--muted);margin:0}
+</style></head><body>
+<nav class="top"><span class="brand">crawl-kit ドメインモデル</span><a href="discovery.html">ディスカバリ</a><a href="event-storming.html">イベントストーミング</a><a href="bounded-contexts.html">境界づけられたコンテキスト</a><a href="context-map.html">コンテキストマップ</a><a href="aggregates.html">集約</a><a href="domain-events.html">ドメインイベント</a><a href="sync.html" class="active">モデル⇔実装 Sync</a></nav>
+<main>
+<h1 id="model-implementation-sync">Model ⇔ Implementation Sync</h1>
+<blockquote><code>--analyze</code>（discover/storming）で発見した差異を判定・計画・実装し、モデルとコードを一致させる台帳。<br>大きな差異 #2/#6 は<strong>アーキテクチャ分岐</strong>のため承認ゲートで方針を選んでから実装する。</blockquote>
+<h2 id="">差異台帳</h2>
+<table><thead><tr><th>#</th><th>由来</th><th>種別</th><th>権威</th><th>決定</th><th>状態</th></tr></thead><tbody><tr><td>1</td><td>discover</td><td>gap</td><td>model</td><td>loop-e2e 本体(9,068 LOC+562 tests)を behavior に忠実移植、rdra-export→emit 置換</td><td><strong>done</strong></td></tr><tr><td>2</td><td>discover</td><td>violation</td><td>model</td><td><strong><code>packages/verification</code> を新設</strong>: unified.json を入力に Finding/Verdict を生成（名寄せでなく検証判定）。reconciler の behavior 名寄せ自体の整理は残</td><td><strong>in-progress</strong></td></tr><tr><td>3</td><td>discover</td><td>misweight</td><td>model</td><td>STRUCTURE.md で reconciler=Supporting を明示（コード削除なし）</td><td><strong>done</strong>(doc)</td></tr><tr><td>4</td><td>discover</td><td>naming</td><td>model</td><td>README/STRUCTURE 語彙是正（差分=intent↔structure、Core=検証、reconciler=Supporting）</td><td><strong>done</strong>(doc)</td></tr><tr><td>5</td><td>storming</td><td>duplication</td><td>deferred</td><td>adjudication+burn-in は別文脈で維持（統合しない・ユーザー決定）</td><td><strong>deferred</strong></td></tr><tr><td>6</td><td>storming</td><td>split</td><td>model</td><td>Option B 段階分割に着手: Verification 文脈を独立パッケージで新設（unified 入力・後段）。loop-e2e の verify/explore/scenario/refute の behavior→verification 移設は残</td><td><strong>in-progress</strong></td></tr></tbody></table>
+<h2 id="option-b-vertical-slice">実装結果（Option B vertical slice）</h2>
+<ul><li><strong>新規 <code>packages/verification</code></strong>（Core・後段）: <code>model.ts</code>(Finding/Verdict/RefuterVote) ＋ <code>verify.ts</code>(reconcile 状態→Finding) ＋ <code>adjudicate.ts</code>(3レンズ反証パネル→Verdict) ＋ cli/index/test。</li><li><strong>データフロー確定</strong>: <code>… → reconciler → unified.json → verification → data/verification.findings.json</code>（root <code>pnpm demo</code> / <code>pnpm verify</code> に組込）。</li><li><strong>reconcile 後段だから出せる検証を実証</strong>: <code>violates-decision(Payment)</code> を <code>decision-violation/bug[adr:0010]</code> Finding として、<code>/orders/777</code> の 5xx を <code>runtime-error/bug</code> として生成（計 7 findings: 2 bug / 5 uncertain）。</li><li><strong>検証</strong>: 7パッケージ build green、<strong>626 tests pass（+7 verification、後方互換維持・behavior は当面そのまま）</strong>。</li><li><strong>後方互換</strong>: behavior(loop-e2e) は無変更で稼働。demo の behavior 入力は <code>data/behavior.nodes.json</code>（将来 <code>loop-e2e run + emit</code> が供給）。</li></ul>
+<h2 id="">残スコープ（次の赤付箋）</h2>
+<ul><li>loop-e2e の verify/explore/scenario/refute を behavior→verification へ<strong>実移設</strong>（現状は reconcile-aware の最小検証のみ）。検証の「期待」を baseline→unified に総替え。</li><li>behavior を「観測(crawl)のみ」に縮小（#2 の完了）。reconciler の behavior 名寄せを verdict 受け渡しへ整理。</li><li>demo の behavior 入力を <code>loop-e2e run + emit</code> に正式配線（現状は demo 用 <code>behavior.nodes.json</code>）。</li></ul>
+<h2 id="">差異の詳細と計画</h2>
+<h3 id="4-naming-doc">#4 naming（低リスク・doc のみ・即実装可）</h3>
+<ul><li><strong>発見</strong>: README「差分」/ docs「心臓=reconciler」が discovery（Core=検証）と食い違う。</li><li><strong>権威</strong>: model。<strong>計画</strong>: README/STRUCTURE/ARCHITECTURE の語彙を是正（差分=intent↔structure 限定、Core=検証）。</li><li><strong>影響</strong>: ドキュメントのみ。コード・テストに影響なし。スコープ外: 既存の <code>unified.json</code> の <code>divergences</code> フィールド名は据え置き（破壊回避）。</li></ul>
+<h3 id="3-misweight-doc">#3 misweight（低リスク・doc 主体）</h3>
+<ul><li><strong>発見</strong>: reconciler の intent 辺が厚い(478 LOC)が、intent 非所有ゆえ Supporting。</li><li><strong>権威</strong>: model。<strong>計画</strong>: docs と package 説明で「reconciler=Supporting（名寄せ土台）」を明示。<strong>コード削除はしない</strong>（intent 接続時に活きる）。</li></ul>
+<h3 id="2-6">#2 / #6 アーキテクチャ分岐（高リスク・要承認）</h3>
+<ul><li><strong>発見</strong>: 忠実移植は loop-e2e 全機能を behavior に格納。モデルは「観測(behavior) / 検証(後段の独立 Verification)」分割を要求。</li><li><strong>コードの事実</strong>:<ul><li>behavior は <code>pipeline/{collect,diff,verify,explore,executeScenarios,grow,report}</code> ＋ <code>services/{browser,llm,explore}</code> ＋ state/scenario/config/cli を一体で持つ。</li><li>検証の「期待」は現状 <strong>baseline(SiteStructure)</strong>。モデルは <strong>unified.json(reconcile結果)</strong> を期待にせよと要求 → <strong>パイプライン最深部の入力差し替え</strong>が要る。</li><li>562 tests がこの一体構造に紐づく。分割は再ホーム＋配線替えを伴う。</li></ul></li><li><strong>権威</strong>: model（分割が正）。だが<strong>コストとリスクが大きい</strong>ため方針を選ぶ。</li></ul>
+<h4 id="">方針分岐（承認ゲート）</h4>
+<table><thead><tr><th>案</th><th>内容</th><th>コスト/リスク</th></tr></thead><tbody><tr><td><strong>A. 一括分割</strong></td><td>即 <code>packages/verification</code> を作り verify/explore/scenario/refute/report/state(findings,known) を移設、入力を baseline→unified に総替え</td><td>高（9k LOC 再ホーム・562 tests 配線替え・diff にノイズ）。一気に緑にするのは困難</td></tr><tr><td><strong>B. 段階分割（vertical slice・推奨）</strong></td><td>①#3/#4 の doc 是正を先に → ②<code>packages/verification</code> の骨組み（unified.json を読み Finding/Verdict を emit する最小経路＋1カテゴリ）を<strong>新規追加</strong> → ③behavior の verify を段階移設。各段で緑を保つ</td><td>中（段階的・後方互換維持）。behavior は当面そのまま動く</td></tr><tr><td><strong>C. モデル先行（実装は据え置き）</strong></td><td>コードは現状維持（loop-e2e in behavior）。sync.md に目標アーキを記録し #2/#6 を planned のまま据え置き</td><td>低（doc のみ）。実装は後日</td></tr></tbody></table>
+<h2 id="">スコープ外・残課題（新しい赤付箋）</h2>
+<ul><li>検証の「期待」に intent をどこまで使うか（intent 非所有 → 最小依存）。</li><li>Fingerprint 算出規則の確定（events/types）。</li><li>burn-in（Reconciliation / Convergence）の共有 VO 化是非。</li></ul>
+<h2 id="">未解決の問い</h2>
+<ul><li>#2/#6 をどの案で進めるか（A/B/C）。</li></ul>
+</main>
+<footer>crawl-kit ドメインモデル &nbsp;|&nbsp; source: <code>docs/domain/sync.md</code> &nbsp;|&nbsp; generated by /ddd publish</footer>
+
+</body></html>

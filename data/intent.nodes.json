@@ -1,0 +1,147 @@
+[
+  {
+    "nodeId": "intent:concept/concept:order",
+    "layer": "intent",
+    "localName": "Order",
+    "raw": {
+      "conceptId": "concept:order",
+      "canonicalName": "Order",
+      "aliases": [],
+      "kind": "aggregate-root",
+      "context": null,
+      "attributes": [
+        "id",
+        "customerId",
+        "total",
+        "status",
+        "placedAt"
+      ],
+      "dependsOn": [
+        "Customer"
+      ]
+    },
+    "source": {
+      "tool": "distill-ddd",
+      "runId": "intent-25596"
+    }
+  },
+  {
+    "nodeId": "intent:concept/concept:customer",
+    "layer": "intent",
+    "localName": "Customer",
+    "raw": {
+      "conceptId": "concept:customer",
+      "canonicalName": "Customer",
+      "aliases": [],
+      "kind": "aggregate-root",
+      "context": null,
+      "attributes": [
+        "id",
+        "name",
+        "email"
+      ],
+      "dependsOn": []
+    },
+    "source": {
+      "tool": "distill-ddd",
+      "runId": "intent-25596"
+    }
+  },
+  {
+    "nodeId": "intent:concept/concept:product",
+    "layer": "intent",
+    "localName": "Product",
+    "raw": {
+      "conceptId": "concept:product",
+      "canonicalName": "Product",
+      "aliases": [],
+      "kind": "aggregate-root",
+      "context": null,
+      "attributes": [
+        "id",
+        "name",
+        "price",
+        "sku"
+      ],
+      "dependsOn": []
+    },
+    "source": {
+      "tool": "distill-ddd",
+      "runId": "intent-25596"
+    }
+  },
+  {
+    "nodeId": "intent:concept/concept:payment",
+    "layer": "intent",
+    "localName": "Payment",
+    "raw": {
+      "conceptId": "concept:payment",
+      "canonicalName": "Payment",
+      "aliases": [],
+      "kind": "aggregate-root",
+      "context": null,
+      "attributes": [
+        "id",
+        "orderId",
+        "amount",
+        "method"
+      ],
+      "dependsOn": [
+        "Order"
+      ]
+    },
+    "source": {
+      "tool": "distill-ddd",
+      "runId": "intent-25596"
+    }
+  },
+  {
+    "nodeId": "intent:concept/concept:shipment",
+    "layer": "intent",
+    "localName": "Shipment",
+    "raw": {
+      "conceptId": "concept:shipment",
+      "canonicalName": "Shipment",
+      "aliases": [],
+      "kind": "aggregate-root",
+      "context": null,
+      "attributes": [
+        "id",
+        "orderId",
+        "address",
+        "carrier"
+      ],
+      "dependsOn": [
+        "Order"
+      ]
+    },
+    "source": {
+      "tool": "distill-ddd",
+      "runId": "intent-25596"
+    }
+  },
+  {
+    "nodeId": "intent:concept/concept:refund",
+    "layer": "intent",
+    "localName": "Refund",
+    "raw": {
+      "conceptId": "concept:refund",
+      "canonicalName": "Refund",
+      "aliases": [],
+      "kind": "entity",
+      "context": null,
+      "attributes": [
+        "id",
+        "paymentId",
+        "amount"
+      ],
+      "dependsOn": [
+        "Payment"
+      ]
+    },
+    "source": {
+      "tool": "distill-ddd",
+      "runId": "intent-25596"
+    }
+  }
+]
