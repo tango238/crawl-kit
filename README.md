@@ -67,7 +67,7 @@ npx @tanago3/crawl-kit serve [--port N]  # ビューア起動（ダッシュボ�
 
 - `data/` は**実行したプロジェクトのルート**（最寄りの package.json）に作られます。
 - **`analyze` は structure と behavior の両方**を鮮度ゲート付きで取得（`analyze-structure` / `analyze-behavior` で個別実行も可）。
-- **behavior の実取得**はブラウザ駆動のため重い。crawl-kit が **loop-e2e エンジン**を起動して実クロールします（`e2e.config.yaml`＋対象アプリ＋playwright が必要）。npx 単体配布にはエンジンを含めないため、behavior 実取得にはエンジン導入が要ります（未導入時は structure のみ取得し警告）。
+- **behavior の実取得**はブラウザ駆動のため重い。crawl-kit が **loop-e2e エンジン（`@crawl-kit/behavior`）をサブプロセスとして起動**し、対象アプリを実クロールします（`.crawl-kit/workspace.yaml`／レガシー経路は `e2e.config.yaml`＋対象アプリ＋playwright が必要）。**このエンジンは npx 配布のバンドルに含まれず（内部 private パッケージ）**、純 `npx @tanago3/crawl-kit` 単体では behavior 実取得はできません（`resolveLoopE2e()` が解決できず structure のみ取得して警告）。behavior まで回すには **crawl-kit のリポジトリ/ワークスペースから実行**してください。
 - **このリポジトリから直接**動かすなら（公開前）: `pnpm build` 後に `pnpm crawl-kit <command>`。
 - **公開する**（誰でも `npx @tanago3/crawl-kit` できるように）: npm にログイン後 `pnpm release`。CLI は **1つの自己完結パッケージ `@tanago3/crawl-kit`**（依存ゼロのバンドル）として publish します（内部の `@crawl-kit/*` は private のままバンドルに同梱）。インストール後のコマンド名は `crawl-kit`。
   - 補足: 素の `crawl-kit`（unscoped）は npm の類似名ガード（既存 `crawlkit`）で弾かれるため、ユーザースコープ `@tanago3/` を使用。別名で出したい場合は `packages/cli/package.json` の `name` を変更。
