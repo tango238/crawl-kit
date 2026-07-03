@@ -1,177 +1,198 @@
-# STRUCTURE — 構成案
+# STRUCTURE — リポジトリ構成
 
-確定したアーキテクチャの構成案。`contract.ts` を背骨に、三層(intent / structure / behavior)を
-共通IDで束ね、reconciler が差分を `unified.json` に落とし、viewer が描く。
+`@crawl-kit/contract` を背骨に、三層（intent / structure / behavior）を共通IDで束ね、
+reconciler が差分を `unified.json` に落とし、verification が裏取りし、viewer が描く。
+`@tanago3/crawl-kit`（CLI）がこれら全部を1つの spine としてまとめ、ワークスペース単位で通しで走らせる。
 
-> **共有クロールパッケージは無い。** rdra が構造専任になりクロールを持たなくなったため、共有すべきクロール機構が
-> 存在しない。クロール/シナリオ/E2E は **behavior(loop-e2e)** の中だけに住む。
+> **共有クロールパッケージは無い。** クロール/シナリオ/E2E/CRUD 検証は **behavior（loop-e2e 由来）** の中だけに住む。
 
 ---
 
 ## トップレベル
 
 ```
-repo/                          # pnpm workspace
-  package.json                 # workspace ルート
-  pnpm-workspace.yaml          # packages/* と skills/* を宣言
-  tsconfig.base.json           # 共通 TS 設定（packages が extends）
+crawl-kit/                       # pnpm workspace
+  package.json                   # workspace ルート（build/test/lint/demo/serve/release スクリプト）
+  pnpm-workspace.yaml            # packages/* を宣言
+  tsconfig.base.json             # 共通 TS 設定
   packages/
-    contract/                  # 背骨：型 + スキーマ + 検証 + I/O
-    reconciler/                # マッチング + 状態分類 + 層またぎ verify
-    viewer/                    # unified.json を描く（状態なし）
-    structure/                 # rdra port（静的抽出のみ）
-    behavior/                  # loop-e2e 吸収（クロール/シナリオ/E2E/検証を所有）
-    llm/                       # （任意・後述）Anthropic API / Claude Code CLI の共通クライアント
-  skills/
-    ddd/                       # distill-ddd（参照のみ。glossary を intent 供給）
-  data/                        # registry.json（永続）と unified.json（派生）の置き場
-    registry.json
-    unified.json
+    contract/                    # 背骨：型 + スキーマ + 検証 + I/O + パス/進捗/ワークスペース定義
+    intent/                      # intent 層：glossary → 正準concept + 集約 + 自動ドラフト
+    structure/                   # 静的解析：インクリメンタル分析 + rdra 図 + emit
+    behavior/                    # loop-e2e 吸収：クロール/シナリオ/CRUD/検証を所有
+    reconciler/                  # 証拠マッチ + 状態分類 + ADR 裁定 → unified.json
+    verification/                # Core：unified を「期待」として検証 → findings/verdicts
+    freshness/                   # 取得鮮度：TTL + 内容ハッシュで再取得を間引く
+    viewer/                      # ビューア：ダッシュボード + 4メニュー SPA（状態なし）
+    cli/                         # @tanago3/crawl-kit（npx エントリ。全部を1コマンドに）
+  docs/                          # ARCHITECTURE / DATA-MODEL / OPERATIONS / ROADMAP / adr / domain / superpowers
+  data/                          # 成果物（intent/structure/behavior/unified/findings）+ registry.json
 ```
 
-データの流れ:
+## データの流れ
 
 ```
-distill-ddd ─(glossary.json: intent nodes + 正準ID発行)─┐
-rdra(structure) ─(structure nodes + route key)──────────┤
-loop-e2e(behavior) ─(findings/scenarios + route key)────┘
-                                                         │
-                                                         ▼
-                                                   reconciler
-                                  ┌── 読/書 ──> data/registry.json（永続・人の判断を焼き込む）
-                                  └── 書 ─────> data/unified.json（派生・使い捨て）
-                                                         │
-                                                         ▼
-                                                       viewer（描くだけ）
+intent(distill-ddd / 自動ドラフト) ─(intent.nodes + aggregates + 正準ID)─┐
+structure(静的解析) ───────────────(structure.nodes + route key)─────────┤
+behavior(クロール+CRUD) ───────────(behavior.nodes + edges/sitemap/persisted)┘
+                                                                          │
+                                                                          ▼
+                                                                    reconciler ── registry.json（永続・人の判断）
+                                                                          │  └─────> unified.json + mapping.aggregate-entity.json（派生）
+                                                                          ▼
+                                                                    verification ──> *.findings.json / verdicts
+                                                                          │
+                                                                          ▼
+                                                                      viewer（描くだけ）
 ```
+
+CLI（`crawl-kit run`）がこの流れ全体をワークスペース単位で駆動し、進捗を `.crawl-kit/progress.json` に台帳化、viewer を自動起動する。
 
 ---
 
 ## packages/contract — 背骨
 
-唯一、他の全員が依存するパッケージ。型の単一の真実。
+唯一、他の全員が依存するパッケージ。型の単一の真実。**何にも依存しない（背骨は葉）。**
 
 ```
 contract/src/
-  model.ts        # contract.ts の中身（Concept / Adr / Relation / Registry / Unified …）
+  model.ts        # Concept / Adr / Relation / Registry / Unified / LayerNode …
   validate.ts     # 参照整合性：dangling な conceptId/adrId を許さない。失敗で書き込み中断
-  io.ts           # registry.json / unified.json の atomic read/write
-  index.ts        # re-export
+  io.ts           # registry.json / unified.json 等の atomic read/write
+  paths.ts        # DATA_FILES（成果物ファイル名）とパス解決
+  workspace.ts    # findWorkspaceRoot / findRepoRoot（.crawl-kit/workspace.yaml 探索）
+  progress.ts     # 進捗台帳（progress.json）の型と遷移ヘルパ
+  route.ts        # normalizeRoute（"METHOD /path" 正準キー。structure↔behavior の強い鍵）
+  concurrency.ts  # makeLimiter / resolveClaudeCodeConcurrency（CLAUDE_CODE_MAX_CONCURRENCY, 既定3）
 ```
 
-- `validate.ts` は loop-e2e がすでに持つ「常に参照的に妥当・検証失敗で abort」をそのまま昇格させる。
-- 他パッケージは型を `@crawl-kit/contract` から import するだけ。
+## packages/intent — intent 層
 
-## packages/reconciler — 照合（Supporting）
-
-> DDD ディスカバリの結論: Core は **検証（Verification）** であり、reconciler は検証の「期待」を整える
-> **Supporting**（名寄せ・照合の土台）。intent 辺を所有しないため差別化の核ではない。詳細は
-> [docs/domain/discovery.md](./docs/domain/discovery.md) / [bounded-contexts.md](./docs/domain/bounded-contexts.md)。
-
-層のノードを食べ、同一性を判定し、状態を分類し、ADR で裁定し、`unified.json` を吐く。
-**「自動 or 手動」は別機能ではなく `direction` と `threshold` の2パラメータに畳む。**
+glossary（distill-ddd 由来、または自動ドラフト）を正準 concept として供給し、正準名/IDの発生源になる。
 
 ```
-reconciler/src/
-  ingest.ts       # 各層の emit を LayerNode[] として取り込む
-  match/
-    name.ts       # 語彙シグナル（弱・ノイジー）
-    attributes.ts # 属性集合の重なり（構造的に最強）
-    topology.ts   # 関係トポロジーの一致
-    behavior.ts   # 同じ操作が触るか（command/event ↔ UC×CRUD）
-    llm.ts        # 上の構造証拠を入力に渡して接地させた LLM 判定
-    index.ts      # 決定的(構造)を先に計算 → 残りだけ llm。Evidence を返す（単一スコアにしない）
-  classify.ts     # ConceptState を決定（aligned / intent-only / code-only /
-                  #   aggregate-internal / implementation-detail / adjudicated /
-                  #   violates-decision / unmatched）
-  adr.ts          # ADR の constraints をトポロジーに照合 → adjudicated / violates-decision
-  verify.ts       # rdra から吸収：シナリオ×画面の突き合わせ（層またぎ照合）
-  queue.ts        # threshold 未満 → 手作業キュー。人の判断を registry に焼き込む（次回は聞かない）
-  pipeline.ts     # ingest → match → (direction,threshold) → classify → adr → emit
-  index.ts
+intent/src/
+  glossary-schema.ts # intent.json（Glossary）契約スキーマ
+  model.ts           # intent モデル
+  aggregates.ts      # 集約とその構成概念 → intent.aggregates.json
+  draft.ts           # intent.json が無いとき LLM で骨組みを自動ドラフト
+  emit.ts            # intent-layer LayerNode[] へ（+ aggregates emission）
+  cli.ts
 ```
 
-- マッチは **1:1 を仮定しない**(集約1 ↔ テーブル複数)。`Relation` の多対多で持つ。
-- 「孤児だ」と言う前に **`part-of`（マッチ済み集約の境界内か）を先に見る**。これで怖い未マッチの
-  大半が穏やかな aggregate-internal に変わる。
+## packages/structure — 静的解析
 
-## packages/viewer — 一箇所
-
-`unified.json` を読んで差分を描く。**状態を持たない**(registry は触らない)。
-ConceptState がそのまま色の凡例。divergence の edge が赤くなる所。
-
-```
-viewer/
-  src/                # v1 は素朴でいい：概念を選ぶ → intent/structure/behavior が並ぶ → 食い違いが色づく
-  index.html
-```
-
-- rdra の `viewer.html` と loop-e2e の `report.md` を置き換える最終的な単一ビュー。
-
-## packages/structure — rdra port（静的のみ）
-
-rdra-analyzer の**静的抽出コアだけ**を TS へ。クロール・シナリオ・E2E・viewer は来ない。
+ソースコードから route/コントローラ/モデル/ユースケース/情報モデルを抽出。**インクリメンタル分析**（unit×pass、内容ハッシュでキャッシュ＝差分）と従来の一括解析の両方を持つ。
 
 ```
 structure/src/
   analyze/
-    source-parser.ts      # ← analyzer/source_parser.py
-    screen-analyzer.ts    # ← analyzer/screen_analyzer.py
-    usecase-extractor.ts  # ← analyzer/usecase_extractor.py
-    information-model.ts   # ← rdra/information_model.py
-  rdra/
-    diagrams.ts           # ← rdra/*_diagram.py + mermaid_renderer.py（Mermaid 出力）
-  gap/
-    crud.ts               # ← gap/crud_analyzer.py
-  emit.ts                 # 抽出結果を structure-layer LayerNode[] へ（route key 付き）
-  index.ts
+    units.ts / fragments.ts / scoped-parser.ts / merge.ts / passes.ts / incremental.ts
+                        # 増分・分散・段階アナライザ（repo→unit→fragment cache→merge→pass）
+    source-parser.ts    # 一括ソース解析（従来経路）
+    usecase-extractor.ts / information-model.ts / events.ts
+    context/            # フレームワーク知識・プロジェクト文脈
+    derived/            # 派生抽出
+    llm/                # LlmProvider（Anthropic API / Claude Code CLI 切替。オフラインは決定的フォールバック）
+  rdra/                 # ユースケース図/ER図（Mermaid 出力）
+  gap/                  # crud gap 分析
+  emit.ts               # structure-layer LayerNode[] へ（route key 付き）
+  corrections.ts / outputs.ts / crud.ts
 ```
-
-来ないもの（→ 行き先）: `scenarios`,`e2e` → behavior / `verify` → reconciler / `viewer` → viewer。
 
 ## packages/behavior — loop-e2e 吸収
 
-loop-e2e ほぼそのまま。**クロール/シナリオ/E2E/検証はすべてここが所有**。
-`rdra-export`(点と点の縫合)は廃止し、contract への emit に置き換える。
+クロール/シナリオ/CRUD/検証をすべて所有。実アプリをブラウザ駆動でクロールし、通信・画面遷移・データ保存を観測する。
 
 ```
 behavior/src/
-  crawl/        # Playwright クロール（loop-e2e の collect/explore のクロール部）
-  scenario/     # grow / approve（シナリオ生成・採用）
-  run/          # collect → diff → verify(5カテゴリ) → scenarios → persist
-  findings/     # findings store（共通通貨）
-  report/       # 集約・反証ゲート・GitHub issue
-  emit.ts       # findings/scenario を behavior-layer LayerNode[] へ（route key 付き）← 旧 rdra-export の正しい姿
-  index.ts
+  services/             # browser（recorder/discover）・crud（plan/execute/oracle）・explore（dbProbe）等
+  pipeline/             # collect（クロール収集）・explore・diff
+  crawl / scenario      # BFS+クリック発見 / grow・approve（シナリオ）
+  cli/commands/         # run / crud / emit / explore / grow / report … （loop-e2e CLI）
+  config/               # workspace.yaml/e2e.config.yaml スキーマ
+  domain/               # ApiTransaction（seq/ts/pageUrl…）等のドメイン型
+  sitemap.ts            # NavEdge + ページから画面遷移ツリー（roots/orphans）
+  tx-persistence.ts     # mutation tx の persisted 判定（yes/no/unknown、dbProbed ゲート）
+  emit.ts               # behavior-layer LayerNode[] へ（route key + per-tx ノード + persisted）
+  state / util
 ```
 
-## packages/llm —（任意）共通 LLM クライアント
+## packages/reconciler — 照合（Supporting）
 
-rdra も loop-e2e も「`USE_CLAUDE_CODE` で Anthropic API ↔ Claude Code CLI を切替」を各自持っていた。
-structure を TS 化すると **同じ抽象が二重になる**ので、ここで一本化する候補。
-ただし v1 では無理に切り出さなくてよい(各パッケージ内に置いて後で抜いても可)。
+層のノードを食べ、同一性を判定し、状態を分類し、ADR で裁定し、`unified.json` を吐く。
 
-## skills/ddd — distill-ddd（参照のみ）
+```
+reconciler/src/
+  ingest.ts / nodes.ts   # 各層の emit を LayerNode[] として取り込む
+  match/                 # name / attributes / topology / behavior / llm（決定的→llm、Evidence を返す）
+  classify.ts            # ConceptState（aligned / intent-only / code-only / aggregate-internal /
+                         #   implementation-detail / adjudicated / violates-decision / unmatched）
+  adr.ts                 # ADR 制約をトポロジーに照合 → adjudicated / violates-decision
+  aggregate-mapping.ts   # unified + aggregates から集約×エンティティ相関 → mapping.aggregate-entity.json
+  queue.ts               # threshold 未満 → 手作業キュー。判断を registry に焼き込む
+  pipeline.ts / cli.ts
+```
 
-コードは統合しない(CLIエージェントのホームに住むスキルなので独立必須)。**契約だけ**つながる。
-intent 層を供給し、**正準ID(canonicalName)の発生源**になる。
+## packages/verification — 検証（Core）
 
-- 必要な小作業: 現状 `docs/domain/*.md` は散文。contract に流すには `glossary.json`
-  (concept ごとに id・canonicalName・aliases・属性)が要る。
-  選択肢A: distill-ddd 側に emit ステップを足す（発生源で構造化・きれい）／
-  選択肢B: reconciler に markdown パーサを置く（distill-ddd を触らない・早い）。
-  → **intent 辺に着手する時に決める**。route 辺が先なので今は保留でよい。
+reconcile 済みモデルを「期待」として検証する、スイートの中心。
+
+```
+verification/src/
+  verify.ts / boundary.ts   # concept 検証 + route ごとの入力→表示→保存の境界照合
+  adjudicate.ts             # bug / uncertain / unnecessary + ADR 裁定
+  model.ts / cli.ts
+```
+
+## packages/freshness — 取得鮮度
+
+TTL + 内容ハッシュで structure/behavior の再取得を間引く。
+
+```
+freshness/src/
+  hash.ts / freshness.ts / store.ts / model.ts   # hashContent + 取得台帳（acquisition store）
+```
+
+## packages/viewer — ビューア（状態なし）
+
+サーバ側で view-model を組み、ビルド不要の素の ES modules SPA（ハッシュルーティング）で描く。**registry は触らない。**
+
+```
+viewer/
+  src/                  # api.ts（ルートマップ）/ server.ts（配信）/ diff-assemble・diff-view /
+                        #   dashboard-model / intent-model / traffic-model / view-model
+  public/               # index.html（シェル）/ app.js（ルータ）/ style.css / mermaid-render.js
+    views/              # dashboard / intent-* / structure-* / behavior-traffic・sitemap / map-*（観測マップ）
+```
+
+## packages/cli — `@tanago3/crawl-kit`（npx エントリ）
+
+全パッケージを1つの spine としてまとめる。esbuild で**依存ゼロの自己完結バンドル**（`dist/index.js`）に固め、内部 `@crawl-kit/*`（すべて private）を同梱して npm 公開する。
+
+```
+cli/src/
+  index.ts              # コマンドディスパッチ + npx エントリ
+  commands/
+    setup.ts / doctor.ts / migrate.ts     # ワークスペース初期化・プリフライト・移行
+    run.ts / run-phases.ts / behavior-spawn.ts   # 統合実行（intent→…→verify）とフェーズ本体
+    clear.ts / serve.ts                   # クリア（再生成）・ビューア起動
+    repo-analysis.ts / structure-merge.ts / aggregate-mapping-io.ts / prompt.ts / yaml-io.ts
+  samples/              # demo 用の同梱サンプル（intent/structure/behavior）
+```
 
 ---
 
-## 着手順
+## LLM バックエンド
 
-1. **contract**（済：`contract.ts`）。model → validate → io。
-2. **route 辺を一本通す**(structure↔behavior)。最初の動くデモ:
-   - `structure/emit.ts` と `behavior/emit.ts` に route key 付き LayerNode を吐かせる
-     (rdra の `normalizeRoute` 相当を reconciler/match に置く)。
-   - `reconciler/match`（route のみ）→ `classify`（最小）→ `unified.json`。
-   - `viewer` は素朴に。**ここで差分が初めて色づく** = 展開に効くデモ。
-3. **intent 辺**：glossary.json を供給（上のA/Bを決める）→ name/attributes/llm マッチを足す。
-4. **ADR オーバーレイ**：`adr.ts` を有効化 → adjudicated / violates-decision が出る。
-5. **手作業キュー & registry 焼き込み**：2回目以降は新規だけ聞く。
+`USE_CLAUDE_CODE` で Anthropic API ↔ Claude Code CLI を切り替える規約は各パッケージが踏襲する
+（実体は `structure/src/analyze/llm/`）。どちらも未設定ならオフラインの決定的フォールバックで動き、
+曖昧な分は手作業キューに回る（再現可能）。同時実行数は `CLAUDE_CODE_MAX_CONCURRENCY`（既定 3）で制御。
+
+## 元ツール
+
+crawl-kit は置き換えではなく、3つに共通の背骨を与える。
+
+- [**distill-ddd**](https://github.com/tango238/distill-ddd) — 対話的 DDD モデリング。**intent** を所有・正準名を発行。
+- [**rdra-analyzer**](https://github.com/tango238/rdra-analyzer) — ユースケース/情報モデルの静的抽出。**structure** の源流。
+- [**loop-e2e**](https://github.com/tango238/loop-e2e) — AI 駆動クロール+検証ループ。**behavior** を所有。

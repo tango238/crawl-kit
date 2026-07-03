@@ -59,4 +59,27 @@
 
 - **edge(辺)** — 二層の間の比較。`intent↔structure` / `structure↔behavior` / `intent↔behavior`。
 - **divergence(差分)** — 辺の上の食い違い。viewer で色づく対象。
-- **route key** — URL/エンドポイントの正規化キー。structure↔behavior の強いマッチ鍵。
+- **route key** — URL/エンドポイントの正規化キー(`normalizeRoute`、`"METHOD /path"`、id 桁は `:id`)。structure↔behavior の強いマッチ鍵。
+
+## ワークスペースとパイプライン
+
+- **workspace(ワークスペース)** — 唯一の作業単位。ルート + `.crawl-kit/`（`workspace.yaml` / `repos/*.yaml` / `progress.json`）。成果物 `data/` もその直下。単一リポジトリでもワークスペースを作る。
+- **pipeline(パイプライン)** — `intent → structure → behavior → reconcile → verify` の通し実行。CLI の `run` が駆動する。
+- **phase(フェーズ)** — パイプラインの各段。`progress.json` で `pending/running/completed/blocked/failed` を持つ。
+- **progress ledger(進捗台帳)** — `.crawl-kit/progress.json`。どのフェーズが・なぜ止まっているか(`blockedReason`)・タスク総数/完了数を記録。resume と viewer ダッシュボードの根拠。
+- **freshness(鮮度)** — TTL + 内容ハッシュで structure/behavior の再取得を間引く仕組み(既定 24h)。
+- **aggregate(集約)** — intent が持つ DDD 集約。構成概念を束ねる。`intent.aggregates.json`。
+- **aggregate-entity mapping** — 集約とエンティティ(リポジトリ/モデル)の相関。reconciler が unified から機械導出、confidence + evidence 付き。`mapping.aggregate-entity.json`。
+
+## structure 分析（インクリメンタル）
+
+- **unit(ユニット)** — 独立に解析できるコードの小片(ルートファイル・コントローラのサブディレクトリ等)。内容ハッシュを持つ。fan-out と差分の単位。
+- **fragment(フラグメント)** — 1 unit × 1 pass の解析結果。`unitId × hash × pass` でキャッシュ = 差分の実体(ハッシュ不変なら再解析ゼロ)。
+- **pass(パス)** — 段階解析の各周回。Pass1=ルート棚卸し(安価)、Pass2=詳細、Pass3=ユニット横断。各 pass 末尾の同期バリアで merge。
+
+## behavior 観測
+
+- **transaction(tx)** — クロール中に記録した同一オリジンの API 通信 1件。`(runId, seq)` で一意。発生元画面 `pageUrl` を持つ。`*.transactions.jsonl`。
+- **persisted(保存判定)** — mutation(POST/PUT/PATCH/DELETE) tx が実際に保存されたか。`yes`/`no`(DB プローブ済み)・`unknown`(未検証)。CRUD オラクルが DB まで確認したときのみ yes/no。tx 単位のノード(`behavior:tx/<route>#<seq>`)に付く。
+- **NavEdge(遷移辺)** — クロールで踏んだ画面遷移(`from`/`to`/`kind`=`link`|`click`/`label?`)。`to` はリダイレクト解決後の最終 URL。
+- **sitemap(画面遷移ツリー)** — NavEdge とページから組む `roots`(木) + `orphans`(どの辺からも辿れないページ)。`behavior.sitemap.json`。

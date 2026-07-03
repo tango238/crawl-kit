@@ -19,18 +19,24 @@ pnpm -r lint
 
 ## workspace
 
-`pnpm-workspace.yaml` が `packages/*` と `skills/*` を宣言する。パッケージ間依存は
+`pnpm-workspace.yaml` が `packages/*` を宣言する。パッケージ間依存は
 `@crawl-kit/*` で参照する。**全パッケージが `@crawl-kit/contract` に依存してよいが、
 contract は何にも依存しない**(背骨は葉であるべき)。
 
 ```
-packages/contract     # 依存: なし
-packages/reconciler   # 依存: contract (+ llm)
-packages/structure    # 依存: contract (+ llm)
-packages/behavior     # 依存: contract (+ llm)
-packages/viewer       # 依存: contract のみ（型だけ。実行時は unified.json を読む）
-packages/llm          # 依存: なし
+packages/contract      # 依存: なし（背骨）
+packages/intent        # 依存: contract
+packages/structure     # 依存: contract, freshness, reconciler
+packages/behavior      # 依存: contract
+packages/reconciler    # 依存: contract
+packages/verification  # 依存: contract
+packages/freshness     # 依存: contract
+packages/viewer        # 依存: contract のみ（型だけ。実行時は data/*.json を読む）
+packages/cli           # 依存(bundled): 上記すべて（esbuild で 1 つの自己完結バンドルに同梱）
 ```
+
+内部 `@crawl-kit/*` は**すべて `private: true`**。公開するのは CLI（`@tanago3/crawl-kit`）1つだけで、
+内部パッケージはそこにバンドルされる（依存ゼロ配布）。
 
 ## パッケージの追加
 
@@ -52,25 +58,20 @@ ANTHROPIC_API_KEY=sk-ant-...
 USE_CLAUDE_CODE=true   # 真値: 1 / true / yes（大文字小文字無視）
 ```
 
-将来 `packages/llm` に一本化する(ROADMAP v2)。それまでは各パッケージ内で同じ環境変数を読む。
+LLM クライアントは別パッケージには切り出さず、各パッケージが同じ環境変数を読む
+（実体は `packages/structure/src/analyze/llm/`）。どちらも未設定ならオフラインの決定的
+フォールバックで動く。同時実行数は `CLAUDE_CODE_MAX_CONCURRENCY`（既定 3）で制御。
 
-## rdra の移植(Python → TS)指針
+## 元ツールの取り込み（完了済み・不変条件）
 
-`packages/structure` は rdra-analyzer の **静的抽出コアのみ** を移植する。来ないもの:
-`scenarios`/`e2e` → behavior、`verify` → reconciler、`viewer` → viewer。
+rdra-analyzer の静的抽出は `packages/structure` に、loop-e2e のクロール/シナリオ/E2E/CRUD は
+`packages/behavior` に取り込み済み（各パッケージ構成は [STRUCTURE.md](./STRUCTURE.md) 参照）。
+機能追加時に守る不変条件:
 
-移植対象と元ファイルの対応は [STRUCTURE.md](./STRUCTURE.md) の `packages/structure` 節を参照。
-方針:
-
-- LLM 駆動の解析ロジック(プロンプト)は挙動を変えずに移す。プロンプト文言は据え置きが安全。
-- `CLAUDE.md`/`AGENTS.md` をコンテキストに使う仕組みはそのまま踏襲。
-- 出力は最終的に **`emit.ts` で contract の `LayerNode` に変換**する。route key を必ず付ける
-  (structure↔behavior マッチの鍵)。
-
-## loop-e2e の吸収
-
-すでに TS。`packages/behavior` へ移し、**`rdra-export` を削除**して `emit.ts`(contract への出力)に
-置き換える。クロール/シナリオ/E2E/検証は behavior が所有し続ける(分割しない)。
+- `scenarios`/`e2e`/`crud` は **behavior が所有**（分割しない）。`verify` は verification、描画は viewer。
+- 各層の最終出力は **`emit.ts` で contract の `LayerNode` に変換**し、**route key を必ず付ける**
+  （structure↔behavior マッチの鍵）。
+- `CLAUDE.md`/`AGENTS.md` をコンテキストに使う仕組みはそのまま。プロンプト文言の変更は挙動が変わるので慎重に。
 
 ## ADR プロセス
 
@@ -86,6 +87,20 @@ USE_CLAUDE_CODE=true   # 真値: 1 / true / yes（大文字小文字無視）
 - 契約(`packages/contract`)を変える PR は、影響する全 consumer の追従を同じ PR に含める
   (monorepo を選んだ理由がこれ。原子的更新)。
 - スキーマ変更は [docs/DATA-MODEL.md](./docs/DATA-MODEL.md) も同時更新。
+
+## 公開（npm）
+
+CLI は `@tanago3/crawl-kit` として npm に publish する。`pnpm release` が全パッケージをビルドし、
+private でない CLI 1つだけを公開する（内部 `@crawl-kit/*` は private なので対象外・バンドルに同梱済み）。
+
+```bash
+pnpm release   # = pnpm -r build && pnpm -r publish --access public --no-git-checks
+```
+
+- **認証**: `~/.npmrc` の `//registry.npmjs.org/:_authToken=${NPM_TOKEN}` と環境変数 `NPM_TOKEN`
+  （granular token 推奨。2FA/OTP をバイパスできる）。**token はリポジトリに絶対に置かない**（ホームの `~/.npmrc`/`~/.zshrc` のみ）。
+- **バージョン**: 公開前に `packages/cli/package.json` の `version` を上げる。
+- **確認**: `npm view @tanago3/crawl-kit version` と、別ディレクトリで `npx -y @tanago3/crawl-kit@<ver> --help`。
 
 ## テストの当て所
 
