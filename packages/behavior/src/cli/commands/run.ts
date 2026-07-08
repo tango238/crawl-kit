@@ -19,6 +19,8 @@ export type RunOpts = {
   explore?: boolean
   /** Screen paths for the explore stage (falls back to config.explore.screens). */
   screens?: string[]
+  /** Listing screens for the explore stage to expand one level (falls back to config.explore.screenPrefixes). */
+  screenPrefixes?: string[]
   /** Skip the final DB re-seed (dev escape hatch; explore writes will NOT be restored). */
   noReseed?: boolean
 }

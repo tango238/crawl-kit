@@ -11,7 +11,14 @@ import type {
 } from '../services/explore/types.js'
 import type { ExploreExecDeps } from '../services/explore/execute.js'
 
-export type ExploreOpts = { target?: string; screens?: string[]; skipPrepare?: boolean; noReseed?: boolean }
+export type ExploreOpts = {
+  target?: string
+  screens?: string[]
+  /** Listing screens to expand one level (depth-1): their same-prefix links are added as explore targets. */
+  screenPrefixes?: string[]
+  skipPrepare?: boolean
+  noReseed?: boolean
+}
 
 export type ExploreResult = {
   findings: VerifyFinding[]
@@ -36,6 +43,8 @@ export type ExploreDeps = {
   createPage: () => Promise<PageLike>
   authenticate: (page: PageLike, target: TargetEnv, creds: { username: string; password: string }) => Promise<LoginResult>
   discoverForms: (page: PageLike, target: TargetEnv, screens: string[]) => Promise<DiscoveredForm[]>
+  /** Depth-1 expansion of `opts.screenPrefixes` (optional — omitted/undefined ⇒ no expansion). */
+  expandScreenPrefixes?: (page: PageLike, target: TargetEnv, prefixes: string[]) => Promise<string[]>
   inferCandidateTables: (form: DiscoveredForm, llm: Llm) => Promise<string[]>
   introspectTable: (db: DbAdapter, dbType: 'postgres' | 'mysql', table: string) => Promise<ColumnDef[]>
   modelConstraints: (form: DiscoveredForm, columns: ColumnDef[], sourceRules: string, llm: Llm) => Promise<FieldConstraint[]>
@@ -116,8 +125,14 @@ export async function explore(root: string, opts: ExploreOpts, deps: ExploreDeps
       throw new Error(`explore: authentication failed (${auth.detail}) — aborting before any form submission`)
     }
 
-    // Stage 2: discover forms.
-    const screens = opts.screens ?? []
+    // Stage 2: discover forms. Explicit screens, plus (when both a non-empty screenPrefixes and the
+    // expandScreenPrefixes dep are given) their depth-1 link expansion — deduped, explicit first.
+    const explicitScreens = opts.screens ?? []
+    const expandedScreens =
+      opts.screenPrefixes && opts.screenPrefixes.length > 0 && deps.expandScreenPrefixes
+        ? await deps.expandScreenPrefixes(page, deps.target, opts.screenPrefixes)
+        : []
+    const screens = Array.from(new Set([...explicitScreens, ...expandedScreens]))
     const forms = await deps.discoverForms(page, deps.target, screens)
 
     const findings: VerifyFinding[] = []

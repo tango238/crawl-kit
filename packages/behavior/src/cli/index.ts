@@ -136,9 +136,10 @@ program
   .option('--skip-scenarios', 'Skip executing adopted scenarios (only collect/diff/verify)')
   .option('--explore', 'Run the exploratory input-verification stage before verify (destructive; re-seeds after)')
   .option('--screen <path...>', 'Screen path(s) for --explore (falls back to config.explore.screens)')
+  .option('--screen-prefix <path...>', 'Listing screen(s) for --explore to expand one level (falls back to config.explore.screenPrefixes)')
   .option('--no-reseed', 'With --explore: do not re-seed the DB afterward (skips the dev-guard)')
   .option('--no-report', 'Write findings to the store only; aggregate later with `loop-e2e report`')
-  .action(async (opts: { target?: string; skipPrepare?: boolean; skipScenarios?: boolean; explore?: boolean; screen?: string[]; reseed?: boolean; report?: boolean }) => {
+  .action(async (opts: { target?: string; skipPrepare?: boolean; skipScenarios?: boolean; explore?: boolean; screen?: string[]; screenPrefix?: string[]; reseed?: boolean; report?: boolean }) => {
     const cwd = process.cwd()
 
     let config: import('../config/schema.js').Config
@@ -245,6 +246,7 @@ program
       // --- run --explore wiring: explore-state stage + post-explore re-crawl + final reseed ---
       // Built lazily; the heavy explore impls are imported only when --explore is set.
       const exploreScreens = (opts.screen && opts.screen.length > 0) ? opts.screen : (config.explore?.screens ?? [])
+      const exploreScreenPrefixes = (opts.screenPrefix && opts.screenPrefix.length > 0) ? opts.screenPrefix : (config.explore?.screenPrefixes ?? [])
       const selAuth = selectedTarget.auth
       const exploreTarget: import('../domain/types.js').TargetEnv | null =
         selAuth && selAuth.strategy !== 'none'
@@ -350,7 +352,7 @@ program
             }
             // explore runs with prepare/reseed deferred to run: run already prepared, and run owns
             // the final reseed (Stage 5), so noReseed:true here.
-            return explore(root, { target: selectedTarget.name, screens: exploreScreens, skipPrepare: true, noReseed: true }, {
+            return explore(root, { target: selectedTarget.name, screens: exploreScreens, screenPrefixes: exploreScreenPrefixes, skipPrepare: true, noReseed: true }, {
               target: exploreTarget,
               creds,
               dbType,
@@ -393,6 +395,7 @@ program
         skipScenarios: opts.skipScenarios,
         explore: opts.explore,
         screens: exploreScreens,
+        screenPrefixes: exploreScreenPrefixes,
         noReseed: opts.reseed === false,
       }, {
         ctx: runContext,
@@ -636,10 +639,11 @@ program
   .description('Exploratory input-validation testing: drive forms with invalid/boundary values, detect validation gaps + poor error messages')
   .option('--target <name>', 'Target name to run against')
   .option('--screen <path...>', 'Screen path(s) to explore (repeatable)')
+  .option('--screen-prefix <path...>', 'Listing screen(s) to expand one level (same-prefix links become explore targets)')
   .option('--skip-prepare', 'Skip the pre-run prepare phase (repo refresh + setup hooks)')
   .option('--no-reseed', 'Do not re-seed the database after the run (skips the dev-guard)')
   .option('--no-report', 'Write findings to the store only; aggregate later with `loop-e2e report`')
-  .action(async (opts: { target?: string; screen?: string[]; skipPrepare?: boolean; reseed?: boolean; report?: boolean }) => {
+  .action(async (opts: { target?: string; screen?: string[]; screenPrefix?: string[]; skipPrepare?: boolean; reseed?: boolean; report?: boolean }) => {
     const cwd = process.cwd()
     const { runExplore } = await import('./commands/explore.js')
     const { explore } = await import('../pipeline/explore.js')
@@ -647,7 +651,13 @@ program
     try {
       const result = await runExplore(
         cwd,
-        { target: opts.target, screens: opts.screen ?? [], skipPrepare: opts.skipPrepare, noReseed: opts.reseed === false },
+        {
+          target: opts.target,
+          screens: opts.screen ?? [],
+          screenPrefixes: opts.screenPrefix ?? [],
+          skipPrepare: opts.skipPrepare,
+          noReseed: opts.reseed === false,
+        },
         {
           loadConfig,
           explore,

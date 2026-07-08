@@ -101,4 +101,29 @@ describe('explore pipeline', () => {
     expect(deps.writeFindings).toHaveBeenCalledOnce()
     expect(deps.seedDatabase).toHaveBeenCalledOnce()
   })
+
+  it('expands screenPrefixes via the injected dep and dedups against explicit screens (explicit first)', async () => {
+    const discoverForms = vi.fn(async () => [form])
+    const expandScreenPrefixes = vi.fn(async () => ['/orders', '/orders/new', '/user/create'])
+    const deps = baseDeps({ discoverForms, expandScreenPrefixes })
+    await explore('/root', { screens: ['/user/create'], screenPrefixes: ['/orders'] }, deps)
+    expect(expandScreenPrefixes).toHaveBeenCalledWith(expect.anything(), deps.target, ['/orders'])
+    expect(discoverForms).toHaveBeenCalledWith(expect.anything(), deps.target, ['/user/create', '/orders', '/orders/new'])
+  })
+
+  it('leaves screens unchanged when screenPrefixes is empty, even with the dep provided', async () => {
+    const discoverForms = vi.fn(async () => [form])
+    const expandScreenPrefixes = vi.fn(async () => ['/orders'])
+    const deps = baseDeps({ discoverForms, expandScreenPrefixes })
+    await explore('/root', { screens: ['/user/create'] }, deps)
+    expect(expandScreenPrefixes).not.toHaveBeenCalled()
+    expect(discoverForms).toHaveBeenCalledWith(expect.anything(), deps.target, ['/user/create'])
+  })
+
+  it('leaves screens unchanged when screenPrefixes is set but no expandScreenPrefixes dep is provided', async () => {
+    const discoverForms = vi.fn(async () => [form])
+    const deps = baseDeps({ discoverForms })
+    await explore('/root', { screens: ['/user/create'], screenPrefixes: ['/orders'] }, deps)
+    expect(discoverForms).toHaveBeenCalledWith(expect.anything(), deps.target, ['/user/create'])
+  })
 })

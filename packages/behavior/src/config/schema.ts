@@ -98,6 +98,8 @@ export const DEFAULT_CRAWL = { maxPages: 10, maxDepth: 3, excludePaths: [] as st
 const ExploreSchema = z.object({
   /** Default screen paths to explore when `run --explore` is given no --screen flags. */
   screens: z.array(z.string().min(1)).default([]),
+  /** Default listing screens to expand one level when given no --screen-prefix flags. */
+  screenPrefixes: z.array(z.string().min(1)).default([]),
 })
 
 export const ConfigSchema = z.object({

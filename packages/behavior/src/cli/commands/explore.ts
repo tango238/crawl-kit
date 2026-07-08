@@ -65,6 +65,7 @@ export async function runExplore(cwd: string, opts: ExploreOpts, deps: RunExplor
   const { loadScenarios } = await import('../../scenario/schema.js')
   const { findLoginScenario } = await import('../../scenario/loginScenario.js')
   const { discoverForms } = await import('../../services/explore/discover.js')
+  const { expandScreenPrefixes } = await import('../../services/explore/expand.js')
 
   // The designated login scenario owns 2FA (pinCommand + scriptDir); use it for authentication.
   const scenarioDirRaw = config.scenarioDir ?? 'scenarios'
@@ -130,6 +131,7 @@ export async function runExplore(cwd: string, opts: ExploreOpts, deps: RunExplor
         scriptDir: loginScenario?.scriptDir,
       }),
       discoverForms: (page, t, screens) => discoverForms(page, t, screens),
+      expandScreenPrefixes: (page, t, prefixes) => expandScreenPrefixes(page, t, prefixes),
       inferCandidateTables,
       introspectTable,
       modelConstraints,

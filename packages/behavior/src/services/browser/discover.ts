@@ -219,7 +219,7 @@ async function capture(page: PageLike, url: string): Promise<RawPage> {
 }
 
 /** Extract absolute, same-document `<a href>` links resolved against baseUrl. */
-function extractLinks(html: string, baseUrl: string): string[] {
+export function extractLinks(html: string, baseUrl: string): string[] {
   const links: string[] = []
   const re = /<a\b[^>]*\bhref\s*=\s*["']([^"'#]+)["']/gi
   let m: RegExpExecArray | null
