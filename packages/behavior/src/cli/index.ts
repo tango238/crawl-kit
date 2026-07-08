@@ -324,52 +324,23 @@ program
             }
             const creds = exploreCreds
             const { explore } = await import('../pipeline/explore.js')
-            const { discoverForms } = await import('../services/explore/discover.js')
-            const { inferCandidateTables, modelConstraints } = await import('../services/explore/constraintModel.js')
-            const { introspectTable } = await import('../services/explore/dbIntrospect.js')
-            const { generateCases, buildBaseline } = await import('../services/explore/caseGen.js')
-            const { runCase } = await import('../services/explore/execute.js')
-            const { classifyGap, classifyErrorQuality } = await import('../services/explore/oracle.js')
-            const { wasValueSaved } = await import('../services/explore/dbProbe.js')
-            const { createDbAdapter } = await import('../services/db/index.js')
-            const { seedDatabase } = await import('../services/seed/seed.js')
-            const dbConf = config.databases[0]
-            const dbType: 'postgres' | 'mysql' = (dbConf?.type as 'postgres' | 'mysql') ?? 'postgres'
-            const db = dbConf ? createDbAdapter(dbConf, secrets.db[dbConf.passwordEnv] ?? '') : undefined
-            let lastStatus: number | undefined
-            // Pages come from the SHARED authenticated context, so explore does NOT log in again —
-            // its `authenticate` dep is a no-op verifying the already-established session.
-            const exCreatePage = async () => {
-              const page = await (await getAuthedContext()).newPage()
-              const r = page as unknown as { on?: (e: 'response', cb: (res: { status: () => number; request: () => { method: () => string } }) => void) => void }
-              r.on?.('response', (res) => {
-                try {
-                  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(res.request().method().toUpperCase())) lastStatus = res.status()
-                } catch { /* ignore */ }
-              })
-              recorder.attach(page as unknown as RecorderPage, 'explore')
-              return page
-            }
+            const { buildExploreDeps } = await import('./commands/explore-deps.js')
             // explore runs with prepare/reseed deferred to run: run already prepared, and run owns
             // the final reseed (Stage 5), so noReseed:true here.
-            return explore(root, { target: selectedTarget.name, screens: exploreScreens, screenPrefixes: exploreScreenPrefixes, skipPrepare: true, noReseed: true }, {
-              target: exploreTarget,
-              creds,
-              dbType,
-              seed: config.launch?.seed,
+            const deps = await buildExploreDeps({
+              exploreTarget,
+              exploreCreds: creds,
+              targetName: selectedTarget.name,
               config,
-              secrets: allSecrets,
-              execDeps: { secrets: allSecrets, getLastStatus: () => lastStatus },
-              createPage: exCreatePage,
-              // Session already established by the shared context; just confirm it.
-              authenticate: async () => ({ ok: true, detail: 'reusing shared authenticated session', finalUrl: exploreTarget.baseUrl }),
-              discoverForms: (page, t, screens) => discoverForms(page, t, screens),
-              inferCandidateTables, introspectTable, modelConstraints, generateCases, buildBaseline,
-              runCase, classifyGap, classifyErrorQuality, wasValueSaved, db, llm,
-              writeFindings, appendActivity,
-              // Required by ExploreDeps; unused here because noReseed:true (run owns the reseed).
-              seedDatabase: (seed, root, s) => seedDatabase(seed, root, defaultComposeRunner, s),
+              secrets,
+              allSecrets,
+              llm,
+              writeFindings,
+              appendActivity,
+              getAuthedContext,
+              attachRecorder: (page) => recorder.attach(page as unknown as RecorderPage, 'explore'),
             })
+            return explore(root, { target: selectedTarget.name, screens: exploreScreens, screenPrefixes: exploreScreenPrefixes, skipPrepare: true, noReseed: true }, deps)
           }
         : undefined
 

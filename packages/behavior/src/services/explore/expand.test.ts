@@ -32,6 +32,17 @@ describe('matchPrefixLinks', () => {
     const html = '<a href="/orders">Self</a>'
     expect(matchPrefixLinks(html, baseUrl, '/orders')).toEqual(['/orders'])
   })
+
+  it('normalizes a bare prefix (no leading slash) the same as its slash-prefixed form', () => {
+    const html = '<a href="/orders/new">New</a><a href="/users">Users</a>'
+    expect(matchPrefixLinks(html, baseUrl, 'orders')).toEqual(matchPrefixLinks(html, baseUrl, '/orders'))
+    expect(matchPrefixLinks(html, baseUrl, 'orders')).toEqual(['/orders/new'])
+  })
+
+  it('normalizes a trailing-slash prefix to its bare form', () => {
+    const html = '<a href="/orders">Self</a><a href="/orders/new">New</a>'
+    expect(matchPrefixLinks(html, baseUrl, '/orders/')).toEqual(['/orders', '/orders/new'])
+  })
 })
 
 function fakePage(htmlByPath: Record<string, string>, throwFor: Set<string> = new Set()): PageLike {
@@ -77,6 +88,20 @@ describe('expandScreenPrefixes', () => {
     })
     const target: TargetEnv = { name: 't', baseUrl }
     const result = await expandScreenPrefixes(page, target, ['/orders', '/orders/new'])
+    expect(result).toEqual(['/orders', '/orders/new'])
+  })
+
+  it('normalizes a bare prefix (no leading slash) like its slash-prefixed form', async () => {
+    const page = fakePage({ '/orders': '<a href="/orders/new">New</a><a href="/users">Users</a>' })
+    const target: TargetEnv = { name: 't', baseUrl }
+    const result = await expandScreenPrefixes(page, target, ['orders'])
+    expect(result).toEqual(['/orders', '/orders/new'])
+  })
+
+  it('a trailing-slash prefix yields a single self entry (no /orders/ + /orders duplicate)', async () => {
+    const page = fakePage({ '/orders': '<a href="/orders">Self</a><a href="/orders/new">New</a>' })
+    const target: TargetEnv = { name: 't', baseUrl }
+    const result = await expandScreenPrefixes(page, target, ['/orders/'])
     expect(result).toEqual(['/orders', '/orders/new'])
   })
 })

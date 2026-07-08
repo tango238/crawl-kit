@@ -5,13 +5,23 @@ import type { PageLike } from '../browser/crawler.js'
 import type { TargetEnv } from '../../domain/types.js'
 
 /**
+ * Normalize a screen-prefix to an absolute pathname: ensure exactly one leading slash (a bare
+ * `orders` becomes `/orders`, matching config-schema-valid prefixes without one) and strip any
+ * trailing slash (`/orders/` becomes `/orders`), so the same prefix used to build the goto-path
+ * and the one used to match links always agree. `/` collapses to itself.
+ */
+function normalizePrefix(prefix: string): string {
+  return (`/${prefix.replace(/^\/+/, '')}`).replace(/\/+$/, '') || '/'
+}
+
+/**
  * Pure core: find same-origin links in `html` whose pathname falls under `prefix` — the prefix
  * itself, or one of its path segments (`/orders` matches `/orders` and `/orders/123/edit`, but not
  * `/orders-archive`). Returned as pathname+search (query kept, fragment dropped — `extractLinks`
  * never captures fragments in the first place), deduped, in first-occurrence order.
  */
 export function matchPrefixLinks(html: string, baseUrl: string, prefix: string): string[] {
-  const normalizedPrefix = prefix.replace(/\/+$/, '') || '/'
+  const normalizedPrefix = normalizePrefix(prefix)
   const seen = new Set<string>()
   const matches: string[] = []
   for (const link of extractLinks(html, baseUrl)) {
@@ -22,6 +32,9 @@ export function matchPrefixLinks(html: string, baseUrl: string, prefix: string):
     } catch {
       continue
     }
+    // `/` is intentionally NOT treated as "expand entire site": it only matches links whose
+    // pathname is exactly `/` (nothing starts with `//`), so a root prefix degenerates to
+    // matching just itself. Whole-site expansion is the crawler's job, not screen-prefix's.
     if (u.pathname !== normalizedPrefix && !u.pathname.startsWith(`${normalizedPrefix}/`)) continue
     const screenPath = `${u.pathname}${u.search}`
     if (seen.has(screenPath)) continue
@@ -49,8 +62,9 @@ export async function expandScreenPrefixes(page: PageLike, target: TargetEnv, pr
   }
 
   for (const prefix of prefixes) {
-    add(prefix)
-    const url = /^https?:\/\//i.test(prefix) ? prefix : `${base}/${prefix.replace(/^\//, '')}`
+    const normalizedPrefix = normalizePrefix(prefix)
+    add(normalizedPrefix)
+    const url = /^https?:\/\//i.test(prefix) ? prefix : `${base}${normalizedPrefix}`
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
       await page.waitForLoadState('networkidle')
