@@ -43,6 +43,11 @@ describe('matchPrefixLinks', () => {
     const html = '<a href="/orders">Self</a><a href="/orders/new">New</a>'
     expect(matchPrefixLinks(html, baseUrl, '/orders/')).toEqual(['/orders', '/orders/new'])
   })
+
+  it('accepts an absolute same-origin URL prefix, matching by its pathname', () => {
+    const html = '<a href="/orders/new">New</a><a href="/users">Users</a>'
+    expect(matchPrefixLinks(html, baseUrl, 'https://app.test/orders')).toEqual(['/orders/new'])
+  })
 })
 
 function fakePage(htmlByPath: Record<string, string>, throwFor: Set<string> = new Set()): PageLike {
@@ -102,6 +107,13 @@ describe('expandScreenPrefixes', () => {
     const page = fakePage({ '/orders': '<a href="/orders">Self</a><a href="/orders/new">New</a>' })
     const target: TargetEnv = { name: 't', baseUrl }
     const result = await expandScreenPrefixes(page, target, ['/orders/'])
+    expect(result).toEqual(['/orders', '/orders/new'])
+  })
+
+  it('an absolute URL prefix contributes its pathname (no junk /https:// entry) and matches links', async () => {
+    const page = fakePage({ '/orders': '<a href="/orders/new">New</a><a href="/users">Users</a>' })
+    const target: TargetEnv = { name: 't', baseUrl }
+    const result = await expandScreenPrefixes(page, target, ['https://app.test/orders'])
     expect(result).toEqual(['/orders', '/orders/new'])
   })
 })

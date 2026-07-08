@@ -11,8 +11,6 @@ export type AuthedContextLike = { newPage: () => Promise<PageLike> }
 export type BuildExploreDepsInput = {
   exploreTarget: TargetEnv
   exploreCreds: { username: string; password: string }
-  /** Selected target name, forwarded to `explore()`'s opts (not part of ExploreDeps itself, kept here for symmetry with the closure's inputs). */
-  targetName: string
   config: Config
   secrets: Secrets
   allSecrets: string[]

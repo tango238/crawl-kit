@@ -330,7 +330,6 @@ program
             const deps = await buildExploreDeps({
               exploreTarget,
               exploreCreds: creds,
-              targetName: selectedTarget.name,
               config,
               secrets,
               allSecrets,

@@ -5,13 +5,15 @@ import type { PageLike } from '../browser/crawler.js'
 import type { TargetEnv } from '../../domain/types.js'
 
 /**
- * Normalize a screen-prefix to an absolute pathname: ensure exactly one leading slash (a bare
- * `orders` becomes `/orders`, matching config-schema-valid prefixes without one) and strip any
- * trailing slash (`/orders/` becomes `/orders`), so the same prefix used to build the goto-path
- * and the one used to match links always agree. `/` collapses to itself.
+ * Normalize a screen-prefix to an absolute pathname: an absolute URL keeps only its pathname
+ * (`https://app.test/orders` becomes `/orders` — mirroring discoverForms, which also accepts
+ * absolute screen entries), a bare `orders` gains its leading slash (config-schema-valid without
+ * one), and any trailing slash is stripped (`/orders/` becomes `/orders`), so the same prefix
+ * used to build the goto-path and the one used to match links always agree. `/` collapses to itself.
  */
 function normalizePrefix(prefix: string): string {
-  return (`/${prefix.replace(/^\/+/, '')}`).replace(/\/+$/, '') || '/'
+  const path = /^https?:\/\//i.test(prefix) ? new URL(prefix).pathname : prefix
+  return (`/${path.replace(/^\/+/, '')}`).replace(/\/+$/, '') || '/'
 }
 
 /**

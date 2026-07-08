@@ -14,7 +14,6 @@ describe('buildExploreDeps', () => {
     const deps = await buildExploreDeps({
       exploreTarget: target,
       exploreCreds: { username: 'u', password: 'p' },
-      targetName: 't',
       config,
       secrets,
       allSecrets: [],
@@ -57,7 +56,6 @@ describe('buildExploreDeps', () => {
     const deps = await buildExploreDeps({
       exploreTarget: target,
       exploreCreds: { username: 'u', password: 'p' },
-      targetName: 't',
       config,
       secrets,
       allSecrets: [],
