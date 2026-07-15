@@ -36,6 +36,15 @@ export type ExploreSession = {
 const NO_PAGE = '(no-page)'
 const BODY_RENDER_CAP = 4000
 
+/** Framework dev-server chatter that would drown the real API traffic in the session log
+ *  (Next.js HMR/devtools, Vite client). Full fidelity stays in .e2e/runs/<runId>.transactions.jsonl. */
+const SESSION_NOISE_PATHS: RegExp[] = [/^\/_next(\/|$)/, /^\/__nextjs/, /^\/@vite(\/|$)/, /^\/__vite/]
+
+/** Is this tx dev-server noise the human-readable session log should skip? */
+export function isSessionNoise(path: string): boolean {
+  return SESSION_NOISE_PATHS.some((re) => re.test(path))
+}
+
 /** The screen a tx belongs to: the owning page's pathname when parseable, else the raw pageUrl. */
 function screenOf(pageUrl: string | undefined): string {
   if (!pageUrl) return NO_PAGE
@@ -46,12 +55,14 @@ function screenOf(pageUrl: string | undefined): string {
   }
 }
 
-/** Pretty-print a body when it is JSON; otherwise return it unchanged. */
+/** Pretty-print a body when it is JSON; summarize markup documents (full text lives in the
+ *  transactions jsonl); return anything else unchanged. */
 function prettyBody(body: string | undefined): string | undefined {
   if (body == null) return undefined
   try {
     return JSON.stringify(JSON.parse(body), null, 2)
   } catch {
+    if (/^\s*</.test(body)) return `(HTML/XML ボディ省略 — ${body.length} bytes。全文は .e2e/runs/<runId>.transactions.jsonl)`
     return body
   }
 }
@@ -87,6 +98,7 @@ export function buildSession(args: {
   const order: string[] = []
   const byScreen = new Map<string, ApiTransaction[]>()
   for (const tx of args.txs) {
+    if (isSessionNoise(tx.path)) continue
     const screen = screenOf(tx.pageUrl)
     if (!byScreen.has(screen)) {
       byScreen.set(screen, [])

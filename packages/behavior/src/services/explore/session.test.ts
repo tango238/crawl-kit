@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdtemp, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { buildSession, renderSessionMarkdown, saveSession, loadLatestSession } from './session.js'
+import { buildSession, renderSessionMarkdown, saveSession, loadLatestSession, isSessionNoise } from './session.js'
 import type { ApiTransaction } from '../../domain/transaction.js'
 
 function tx(over: Partial<ApiTransaction>): ApiTransaction {
@@ -66,6 +66,27 @@ describe('buildSession', () => {
     const session = buildSession({ runId: 'r', startedAt: 't', target, screens: [], txs: [tx({ requestBody: undefined })] })
     expect(session.pages[0].txs[0].requestBody).toBeUndefined()
     expect('requestBody' in session.pages[0].txs[0]).toBe(true)
+  })
+
+  it('summarizes HTML/XML bodies instead of embedding the markup', () => {
+    const html = '<!DOCTYPE html><html><body>big page</body></html>'
+    const session = buildSession({ runId: 'r', startedAt: 't', target, screens: [], txs: [tx({ responseBody: html })] })
+    const body = session.pages[0].txs[0].responseBody
+    expect(body).toContain('ボディ省略')
+    expect(body).toContain(`${html.length} bytes`)
+    expect(body).not.toContain('<html>')
+  })
+
+  it('drops framework dev-server noise from the session (kept in the transactions jsonl)', () => {
+    expect(isSessionNoise('/_next/static/chunk.js')).toBe(true)
+    expect(isSessionNoise('/__nextjs_original-stack-frame')).toBe(true)
+    expect(isSessionNoise('/@vite/client')).toBe(true)
+    expect(isSessionNoise('/api/v2/orders')).toBe(false)
+    const session = buildSession({
+      runId: 'r', startedAt: 't', target, screens: [],
+      txs: [tx({ path: '/__nextjs_original-stack-frame' }), tx({ path: '/api/v2/orders', seq: 1 })],
+    })
+    expect(session.pages.flatMap((p) => p.txs.map((t) => t.path))).toEqual(['/api/v2/orders'])
   })
 })
 
