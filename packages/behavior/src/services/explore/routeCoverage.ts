@@ -36,6 +36,16 @@ function unionScreens(prev: string[] | undefined, next: Iterable<string>): strin
   return [...set].sort()
 }
 
+/** Screen label for a tx's owning page: its pathname when parseable (matches the session log's
+ *  grouping), else the raw pageUrl. */
+function screenLabel(pageUrl: string): string {
+  try {
+    return new URL(pageUrl).pathname
+  } catch {
+    return pageUrl
+  }
+}
+
 /**
  * Recompute coverage from the inventory (authoritative denominator) and this run's transactions.
  * Only transactions that got a response (`status != null`) can cover a route. Coverage is
@@ -55,7 +65,7 @@ export function updateCoverage(
     if (tx.status == null) continue
     const key = normalizeRoute(`${tx.method} ${tx.path}`)
     const screens = matchedScreens.get(key) ?? new Set<string>()
-    if (tx.pageUrl) screens.add(tx.pageUrl)
+    if (tx.pageUrl) screens.add(screenLabel(tx.pageUrl))
     matchedScreens.set(key, screens)
   }
 

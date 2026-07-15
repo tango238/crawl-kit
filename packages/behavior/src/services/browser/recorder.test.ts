@@ -98,6 +98,25 @@ describe('createRecorder', () => {
     expect(await lines(rec.path)).toHaveLength(0)
   })
 
+  it('settle() drains in-flight response handlers so the snapshot includes late traffic', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rec-'))
+    const rec = createRecorder({ runId: 'late', root, baseUrl: 'http://app.test', secrets: [] })
+    const page = fakePage()
+    rec.attach(page as any, 'explore')
+    let release!: () => void
+    const gate = new Promise<void>((r) => { release = r })
+    page.emitFinished(req({
+      response: async () => {
+        await gate // response body still streaming
+        return { status: () => 200, statusText: () => 'OK', text: async () => '{}' }
+      },
+    }))
+    expect(rec.transactions()).toHaveLength(0) // naive sync snapshot misses the in-flight tx
+    release()
+    await rec.settle()
+    expect(rec.transactions()).toHaveLength(1)
+  })
+
   it('records requests to configured extraOrigins (SPA calling an API on another origin)', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rec-'))
     const rec = createRecorder({

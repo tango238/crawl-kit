@@ -220,8 +220,11 @@ program
       // the app shows such errors as auto-dismissing toasts the DOM scan misses.
       let lastAuthResponse: { status: number; bodyText?: string } | null = null
       // Record every same-origin (+ configured apiOrigins) API req/res of this run to jsonl (masked+capped).
+      // The same runId flows into the explore pipeline so its session/coverage artifacts stay
+      // joinable to this recorder's <runId>.transactions.jsonl.
+      const recorderRunId = `run-${new Date().toISOString().replace(/[:.]/g, '-')}`
       const recorder = createRecorder({
-        runId: `run-${new Date().toISOString().replace(/[:.]/g, '-')}`,
+        runId: recorderRunId,
         root: cwd,
         baseUrl: selectedTarget.baseUrl,
         extraOrigins: selectedTarget.apiOrigins,
@@ -340,7 +343,11 @@ program
               appendActivity,
               getAuthedContext,
               attachRecorder: (page) => recorder.attach(page as unknown as RecorderPage, 'explore'),
-              getTransactions: () => recorder.transactions(),
+              getTransactions: async () => {
+                await recorder.settle() // drain in-flight response handlers so late traffic is included
+                return recorder.transactions()
+              },
+              runId: recorderRunId,
             })
             return explore(root, { target: selectedTarget.name, screens: exploreScreens, screenPrefixes: exploreScreenPrefixes, skipPrepare: true, noReseed: true, noReplay: opts.replay === false }, deps)
           }

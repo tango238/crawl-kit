@@ -22,8 +22,12 @@ export type BuildExploreDepsInput = {
   getAuthedContext: () => Promise<AuthedContextLike>
   /** Attach the run's request/response recorder to a freshly created explore page. */
   attachRecorder: (page: PageLike) => void
-  /** This run's recorded transactions so far (from the shared recorder) — feeds route coverage. */
-  getTransactions?: () => ApiTransaction[]
+  /** This run's recorded transactions so far (from the shared recorder) — feeds route coverage.
+   *  Wire it to settle+snapshot so in-flight response handlers are drained first. */
+  getTransactions?: () => ApiTransaction[] | Promise<ApiTransaction[]>
+  /** The shared recorder's runId — keeps sessions/coverage/findings joinable to the
+   *  <runId>.transactions.jsonl written by that recorder. */
+  runId?: string
 }
 
 /**
@@ -117,5 +121,6 @@ export async function buildExploreDeps(input: BuildExploreDepsInput): Promise<Ex
     // Required by ExploreDeps; unused here because run calls explore with noReseed:true (run owns
     // the final reseed).
     seedDatabase: (seed, root, s) => seedDatabase(seed, root, defaultComposeRunner, s),
+    runId: input.runId,
   }
 }

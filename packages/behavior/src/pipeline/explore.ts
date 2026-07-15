@@ -71,8 +71,9 @@ export type ExploreDeps = {
   // ── Route coverage + session save/replay (all optional — absent ⇒ feature off) ──
   /** Expected-route inventory (the coverage denominator), pre-enumerated from the app's routing. */
   loadRouteInventory?: (root: string) => Promise<RouteInventory | null>
-  /** This run's recorded same-origin transactions (from the attached recorder). */
-  getTransactions?: () => ApiTransaction[]
+  /** This run's recorded same-origin transactions (from the attached recorder). Async so the
+   *  wiring can drain in-flight response handlers (recorder.settle) before snapshotting. */
+  getTransactions?: () => ApiTransaction[] | Promise<ApiTransaction[]>
   /** Previous run's session — its screens are replayed as explore targets unless opts.noReplay. */
   loadLatestSession?: (root: string) => Promise<ExploreSession | null>
   /** Merge this run's matches into the cumulative coverage store (.e2e/explore/coverage.*). */
@@ -224,7 +225,7 @@ export async function explore(root: string, opts: ExploreOpts, deps: ExploreDeps
     // recorded traffic (cumulative across runs); the session log saves per-screen req/res data and
     // doubles as the next run's replay source. Both are best-effort — never fail the run.
     let coverage: CoverageSummary | undefined
-    const txs = deps.getTransactions?.() ?? []
+    const txs = (await deps.getTransactions?.()) ?? []
     if (deps.loadRouteInventory && deps.saveCoverage) {
       try {
         const inventory = await deps.loadRouteInventory(root)

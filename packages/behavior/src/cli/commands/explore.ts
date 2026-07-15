@@ -156,7 +156,10 @@ export async function runExplore(cwd: string, opts: RunExploreOpts, deps: RunExp
       expandScreenPrefixes: (page, t, prefixes) => expandScreenPrefixes(page, t, prefixes),
       // Route coverage + session save/replay (.e2e/explore/): inventory → covered marks → session log.
       loadRouteInventory: (root) => loadRouteInventory(root, routesCfg),
-      getTransactions: () => recorder.transactions(),
+      getTransactions: async () => {
+        await recorder.settle() // drain in-flight response handlers so late traffic is included
+        return recorder.transactions()
+      },
       loadLatestSession,
       saveCoverage: async (root, inventory, txs, coverageRunId) => {
         const prev = await loadCoverageStore(root)

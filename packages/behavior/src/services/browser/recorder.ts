@@ -41,6 +41,9 @@ export type Recorder = {
    *  collector. Populated in-memory as each tx is built (before the async file append), so it
    *  never depends on fs success. Downstream: route-coverage + session log for the explore run. */
   transactions(): ApiTransaction[]
+  /** Wait for in-flight record() handlers (which await response bodies) to finish, so a
+   *  transactions() snapshot taken right after includes late-settling traffic. */
+  settle(): Promise<void>
 }
 
 const API_TYPES = new Set(['xhr', 'fetch', 'document'])
@@ -172,13 +175,24 @@ export function createRecorder(opts: RecorderOptions): Recorder {
     }
   }
 
+  // In-flight record() promises: each awaits the response body before pushing to `collected`,
+  // so a synchronous transactions() snapshot could miss late traffic. settle() drains them.
+  const pending = new Set<Promise<void>>()
+  const track = (p: Promise<void>): void => {
+    pending.add(p)
+    void p.finally(() => pending.delete(p))
+  }
+
   return {
     path,
     attach(page: RecorderPage, stage: RecordStage): void {
-      page.on('requestfinished', (req) => void record(req, stage, false))
-      page.on('requestfailed', (req) => void record(req, stage, true))
+      page.on('requestfinished', (req) => track(record(req, stage, false)))
+      page.on('requestfailed', (req) => track(record(req, stage, true)))
     },
     transactions: () => collected.slice(),
+    settle: async () => {
+      await Promise.allSettled([...pending])
+    },
   }
 }
 

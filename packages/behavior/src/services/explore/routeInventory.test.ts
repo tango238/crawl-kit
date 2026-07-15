@@ -49,6 +49,19 @@ describe('parseRoutesText', () => {
     ])
   })
 
+  it('matches include/exclude prefixes on segment boundaries ("/user" does not cover "/users")', () => {
+    const routes = [
+      { method: 'GET', path: '/user' },
+      { method: 'GET', path: '/users' },
+      { method: 'GET', path: '/user/1' },
+    ]
+    expect(filterRoutes(routes, ['/user'])).toEqual([
+      { method: 'GET', path: '/user' },
+      { method: 'GET', path: '/user/1' },
+    ])
+    expect(filterRoutes(routes, undefined, ['/user'])).toEqual([{ method: 'GET', path: '/users' }])
+  })
+
   it('parses a JSON string array of "METHOD /path"', () => {
     expect(parseRoutesText(JSON.stringify(['GET /orders', 'POST /orders/new']))).toEqual([
       { method: 'GET', path: '/orders' },

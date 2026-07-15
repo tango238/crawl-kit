@@ -23,6 +23,7 @@ describe('buildExploreDeps', () => {
       getAuthedContext: async () => ({ newPage: async () => page }),
       attachRecorder: vi.fn(),
       getTransactions: () => [],
+      runId: 'run-2026-01-01T00-00-00-000Z',
     })
 
     // Pinning the wiring: run --explore silently dropped screen-prefix expansion because
@@ -40,6 +41,9 @@ describe('buildExploreDeps', () => {
     expect(typeof deps.saveCoverage).toBe('function')
     expect(typeof deps.saveSession).toBe('function')
     expect(deps.getTransactions?.()).toEqual([])
+    // The shared recorder's runId must flow into the pipeline, or the session/coverage
+    // artifacts get a pipeline-generated id that no longer joins to <runId>.transactions.jsonl.
+    expect(deps.runId).toBe('run-2026-01-01T00-00-00-000Z')
   })
 
   it('createPage tracks the last mutating-request status via execDeps.getLastStatus', async () => {

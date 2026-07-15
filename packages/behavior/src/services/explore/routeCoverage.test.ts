@@ -50,7 +50,7 @@ describe('updateCoverage', () => {
     expect(byKey['GET /orders'].covered).toBe(true)
     expect(byKey['GET /orders'].firstCoveredRunId).toBe('run1')
     expect(byKey['GET /orders'].lastCoveredAt).toBe('2026-07-15T01:00:00.000Z')
-    expect(byKey['GET /orders/:id'].screens).toEqual(['http://app.test/orders/42'])
+    expect(byKey['GET /orders/:id'].screens).toEqual(['/orders/42']) // pathname label, matching the session log
     expect(byKey['POST /orders'].covered).toBe(false)
   })
 
@@ -82,7 +82,7 @@ describe('updateCoverage', () => {
     const byKey = Object.fromEntries(store.entries.map((e) => [e.key, e]))
     expect(byKey['GET /orders'].firstCoveredRunId).toBe('run1') // preserved
     expect(byKey['GET /orders'].lastCoveredAt).toBe('t2') // refreshed this run
-    expect(byKey['GET /orders'].screens).toEqual(['http://app.test/list', 'http://app.test/orders']) // union, sorted
+    expect(byKey['GET /orders'].screens).toEqual(['/list', '/orders']) // union, sorted, pathname labels
     expect(byKey['POST /orders'].firstCoveredRunId).toBe('run2')
   })
 

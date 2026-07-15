@@ -16,7 +16,6 @@ export type RouteInventory = { source: 'file' | 'command' | 'structure'; routes:
 export type RouteInventoryConfig = { file?: string; command?: string; include?: string[]; exclude?: string[] }
 export type RouteInventoryDeps = { readFile?: (p: string) => Promise<string>; exec?: (command: string, cwd: string) => Promise<string> }
 
-const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
 const OPENAPI_METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const
 
 /** Ensure a leading slash without doubling one, leaving the rest of the path untouched. */
@@ -106,10 +105,16 @@ export function parseRoutesText(text: string): { method: string; path: string }[
   throw new Error('parseRoutesText: valid JSON but no recognized routes shape (expected OpenAPI paths, Laravel route:list, or a string array)')
 }
 
+/** Segment-boundary prefix match: "/user" covers "/user" and "/user/1" but NOT "/users". */
+function underPrefix(path: string, prefix: string): boolean {
+  const pre = prefix.replace(/\/$/, '')
+  return path === pre || path.startsWith(`${pre}/`)
+}
+
 /**
  * Keep routes whose path falls under an include prefix (all, when include is empty/undefined) and
- * drop any under an exclude prefix — exclude wins. Prefixes and paths are compared as leading-slash
- * strings via plain startsWith (documented, deliberately simple — no segment-boundary check).
+ * drop any under an exclude prefix — exclude wins. Prefixes match on whole path segments, so an
+ * include of "/user" does not accidentally pull in "/users".
  */
 export function filterRoutes(
   routes: { method: string; path: string }[],
@@ -120,9 +125,9 @@ export function filterRoutes(
   const exc = (exclude ?? []).map(withLeadingSlash)
   return routes.filter((r) => {
     const p = withLeadingSlash(r.path)
-    if (exc.some((e) => p.startsWith(e))) return false
+    if (exc.some((e) => underPrefix(p, e))) return false
     if (inc.length === 0) return true
-    return inc.some((i) => p.startsWith(i))
+    return inc.some((i) => underPrefix(p, i))
   })
 }
 
