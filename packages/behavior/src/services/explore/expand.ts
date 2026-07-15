@@ -1,5 +1,6 @@
 import { logger } from '../../util/logger.js'
 import { extractLinks } from '../browser/discover.js'
+import { waitForClientRender } from '../browser/render.js'
 import { sameOrigin } from '../browser/recorder.js'
 import type { PageLike } from '../browser/crawler.js'
 import type { TargetEnv } from '../../domain/types.js'
@@ -70,6 +71,9 @@ export async function expandScreenPrefixes(page: PageLike, target: TargetEnv, pr
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
       await page.waitForLoadState('networkidle')
+      // CSR SPAs can pass networkidle before hydration renders any links — wait for the DOM
+      // to settle or the listing expands to nothing (same failure mode as crawl discovery).
+      await waitForClientRender(page)
       for (const match of matchPrefixLinks(await page.content(), base, prefix)) add(match)
     } catch (err) {
       logger.warn({ err: String(err), prefix }, 'explore expand: failed to load screen-prefix page — using prefix only')

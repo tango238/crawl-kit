@@ -54,8 +54,12 @@ describe('updateCoverage', () => {
     expect(byKey['POST /orders'].covered).toBe(false)
   })
 
-  it('skips transactions with no response (status == null)', () => {
-    const txs = [tx({ method: 'POST', path: '/orders', status: undefined, ok: false, failed: true })]
+  it('only successful (2xx/3xx) transactions cover — 401 probes, 500s, and failed requests do not', () => {
+    const txs = [
+      tx({ method: 'POST', path: '/orders', status: undefined, ok: false, failed: true }), // no response
+      tx({ method: 'GET', path: '/orders', status: 401, ok: false }), // unauthorized probe
+      tx({ method: 'GET', path: '/orders/7', status: 500, ok: false }), // server error
+    ]
     const { summary } = updateCoverage(null, inventory, txs, 'run1', 'now')
     expect(summary.covered).toBe(0)
   })

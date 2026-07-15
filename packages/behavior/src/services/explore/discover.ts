@@ -1,4 +1,5 @@
 import { logger } from '../../util/logger.js'
+import { waitForClientRender } from '../browser/render.js'
 import type { PageLike } from '../browser/crawler.js'
 import type { TargetEnv } from '../../domain/types.js'
 import type { DiscoveredForm, FormField } from './types.js'
@@ -65,6 +66,9 @@ export async function discoverForms(
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
       await page.waitForLoadState('networkidle')
+      // CSR SPAs can pass networkidle before hydration renders the form — wait for the DOM
+      // to settle or every screen reads as "no input fields".
+      await waitForClientRender(page)
       const form = parseFormFromHtml(await page.content(), path)
       if (form) forms.push(form)
       else logger.info({ path }, 'explore discover: no input fields — skipping screen')

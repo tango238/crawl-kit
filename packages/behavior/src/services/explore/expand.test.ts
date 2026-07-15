@@ -69,6 +69,27 @@ function fakePage(htmlByPath: Record<string, string>, throwFor: Set<string> = ne
 }
 
 describe('expandScreenPrefixes', () => {
+  it('waits out a late-hydrating CSR shell before collecting links', async () => {
+    // content() serves the empty shell first, then the hydrated listing — mirroring a Next.js
+    // page that passes networkidle before client render. Pre-fix, expansion saw zero links.
+    let url = ''
+    let serves = 0
+    const page = {
+      goto: async (u: string) => { url = u; serves = 0 },
+      url: () => url,
+      waitForLoadState: async () => {},
+      content: async () => {
+        serves += 1
+        return serves < 3
+          ? '<html><body><div id="__next"></div></body></html>'
+          : '<a href="/orders/new">New</a>'
+      },
+    } as unknown as PageLike
+    const target: TargetEnv = { name: 't', baseUrl }
+    const result = await expandScreenPrefixes(page, target, ['/orders'])
+    expect(result).toEqual(['/orders', '/orders/new'])
+  })
+
   it('returns the prefix itself first, then its matched links', async () => {
     const page = fakePage({ '/orders': '<a href="/orders/new">New</a><a href="/users">Users</a>' })
     const target: TargetEnv = { name: 't', baseUrl }

@@ -48,9 +48,11 @@ function screenLabel(pageUrl: string): string {
 
 /**
  * Recompute coverage from the inventory (authoritative denominator) and this run's transactions.
- * Only transactions that got a response (`status != null`) can cover a route. Coverage is
- * cumulative: a route stays covered once covered, keeping its first-covered run id; screens
- * accumulate the union of owning-page paths across runs.
+ * Only SUCCESSFUL transactions (`tx.ok`, i.e. 2xx/3xx) can cover a route — a 401 probe or a 500
+ * proves reachability, not that the screen operation exercised the route ("covered" answers
+ * "確認できた", not "触った"). Failed/error traffic still appears in the session log and jsonl.
+ * Coverage is cumulative: a route stays covered once covered, keeping its first-covered run id;
+ * screens accumulate the union of owning-page paths across runs.
  */
 export function updateCoverage(
   prev: CoverageStore | null,
@@ -62,7 +64,7 @@ export function updateCoverage(
   // This run's matches, keyed by normalized route → the screens the matching txs fired from.
   const matchedScreens = new Map<string, Set<string>>()
   for (const tx of txs) {
-    if (tx.status == null) continue
+    if (!tx.ok) continue
     const key = normalizeRoute(`${tx.method} ${tx.path}`)
     const screens = matchedScreens.get(key) ?? new Set<string>()
     if (tx.pageUrl) screens.add(screenLabel(tx.pageUrl))
