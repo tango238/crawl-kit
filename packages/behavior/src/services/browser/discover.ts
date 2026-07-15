@@ -52,6 +52,7 @@ export async function discoverPages(
   opts: Grow,
   clickDiscovery = false,
   onEdge?: (edge: NavEdge) => void,
+  seedPaths: string[] = [],
 ): Promise<RawPage[]> {
   const baseUrl = target.baseUrl.replace(/\/$/, '')
   const origin = safeOrigin(baseUrl)
@@ -65,6 +66,18 @@ export async function discoverPages(
   // enqueue against the post-navigation URL themselves).
   type QueueItem = { url: string; depth: number; edge?: { from: string; label?: string } }
   const queue: QueueItem[] = [{ url: startUrl, depth: 0 }]
+
+  // Seed screens (from the static inventory) are enqueued at depth 0 alongside the root so they are
+  // visited even when nothing in the app links to them — the coverage denominator must be reachable.
+  // They obey the same origin/asset/logout/exclude gates as discovered links; the per-item `visited`
+  // guard dedupes them against the root and each other. Edge-less (they have no linking parent).
+  for (const seed of seedPaths) {
+    const abs = resolveSeedUrl(seed, baseUrl)
+    if (!abs) continue
+    if (safeOrigin(abs) !== origin) continue
+    if (isAsset(abs) || isLogout(abs) || isExcluded(abs, opts.excludePaths)) continue
+    queue.push({ url: abs, depth: 0 })
+  }
 
   while (queue.length > 0 && results.length < opts.maxPages) {
     const { url, depth, edge } = queue.shift() as QueueItem
@@ -236,6 +249,15 @@ export function extractLinks(html: string, baseUrl: string): string[] {
     }
   }
   return links
+}
+
+/** Resolve a seed screen (a concrete path like `/hotel/123`, or an absolute URL) against baseUrl. */
+function resolveSeedUrl(seed: string, baseUrl: string): string | null {
+  try {
+    return new URL(seed, `${baseUrl}/`).toString()
+  } catch {
+    return null
+  }
 }
 
 /** Normalize to origin+pathname (no query, no fragment, no trailing slash) for dedup. */

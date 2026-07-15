@@ -52,6 +52,10 @@ export async function buildExploreDeps(input: BuildExploreDepsInput): Promise<Ex
   const { loadRouteInventory } = await import('../../services/explore/routeInventory.js')
   const { loadCoverageStore, updateCoverage, saveCoverageStore } = await import('../../services/explore/routeCoverage.js')
   const { buildSession, saveSession, loadLatestSession } = await import('../../services/explore/session.js')
+  const { loadScreenSpecs, specForScreen } = await import('../../services/screens/spec.js')
+  const { specToForm, specToConstraints, specBaseline, resolveFkInputs, orderScreensByDependency } =
+    await import('../../services/screens/specExplore.js')
+  const { checkDisplays } = await import('../../services/screens/displayCheck.js')
 
   const dbConf = input.config.databases[0]
   const dbType: 'postgres' | 'mysql' = (dbConf?.type as 'postgres' | 'mysql') ?? 'postgres'
@@ -87,6 +91,17 @@ export async function buildExploreDeps(input: BuildExploreDepsInput): Promise<Ex
     authenticate: async () => ({ ok: true, detail: 'reusing shared authenticated session', finalUrl: input.exploreTarget.baseUrl }),
     discoverForms: (page, t, screens) => discoverForms(page, t, screens),
     expandScreenPrefixes: (page, t, prefixes) => expandScreenPrefixes(page, t, prefixes),
+    // ScreenSpec-driven exploration — mirrors cli/commands/explore.ts's wiring.
+    screenSpecs: {
+      load: loadScreenSpecs,
+      match: specForScreen,
+      toForm: specToForm,
+      toConstraints: specToConstraints,
+      toBaseline: specBaseline,
+      resolveFk: db ? (inputs) => resolveFkInputs(inputs, db) : undefined,
+      order: orderScreensByDependency,
+      checkDisplays,
+    },
     // Route coverage + session save/replay — mirrors cli/commands/explore.ts's wiring. The
     // transactions come from run's SHARED recorder (collect/login/explore stages all count:
     // any observed operation covers its route).

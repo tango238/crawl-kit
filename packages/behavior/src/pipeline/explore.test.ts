@@ -205,4 +205,106 @@ describe('explore pipeline', () => {
     await explore('/root', { screens: ['/user/create'] }, deps)
     expect(saveSession).not.toHaveBeenCalled()
   })
+
+  const screenSpec = {
+    screen: '/user/create',
+    analyzedAt: 't',
+    uses: [{ method: 'POST', path: '/users' }],
+    submits: {
+      endpoint: { method: 'POST', path: '/users' },
+      inputs: [{ field: 'age', constraints: { field: 'age', type: 'number' as const, required: true, min: 0 }, value: '5' }],
+    },
+    displays: [{ field: 'age', label: '年齢' }],
+  }
+
+  function specDeps(overrides: Partial<NonNullable<ExploreDeps['screenSpecs']>> = {}): NonNullable<ExploreDeps['screenSpecs']> {
+    return {
+      load: async () => [screenSpec],
+      match: (specs, s) => specs.find((x) => x.screen === s) ?? null,
+      toForm: (s, screen) => ({
+        screenPath: screen,
+        submitSelector: 'button[type="submit"]',
+        fields: [{ name: 'age', selector: '[name="age"]', htmlType: 'number' }],
+      }),
+      toConstraints: () => [constraint],
+      toBaseline: () => ({ '[name="age"]': '5' }),
+      order: (screens) => screens,
+      ...overrides,
+    }
+  }
+
+  it('drives spec-covered screens WITHOUT browser-time LLM (no infer/introspect/model/quality; rule cases only)', async () => {
+    const inferCandidateTables = vi.fn(async () => ['users'])
+    const modelConstraints = vi.fn(async () => [constraint])
+    const classifyErrorQuality = vi.fn(async () => [])
+    const generateCases = vi.fn(async () => [gapCase])
+    const discoverForms = vi.fn(async () => [])
+    const deps = baseDeps({
+      inferCandidateTables,
+      modelConstraints,
+      classifyErrorQuality,
+      generateCases,
+      discoverForms,
+      screenSpecs: specDeps(),
+    })
+    const res = await explore('/root', { screens: ['/user/create'] }, deps)
+    expect(inferCandidateTables).not.toHaveBeenCalled()
+    expect(modelConstraints).not.toHaveBeenCalled()
+    expect(classifyErrorQuality).not.toHaveBeenCalled()
+    // rule cases only: no llm handed to case generation on the spec path
+    expect(generateCases).toHaveBeenCalledWith([constraint], undefined)
+    // spec-covered screens are excluded from live discovery
+    expect(discoverForms).toHaveBeenCalledWith(expect.anything(), deps.target, [])
+    expect(res.specDriven).toBe(1)
+    expect(res.forms).toBe(1)
+  })
+
+  it('falls back to the live LLM path for screens without a spec', async () => {
+    const inferCandidateTables = vi.fn(async () => ['users'])
+    const deps = baseDeps({
+      inferCandidateTables,
+      screenSpecs: specDeps({ load: async () => [screenSpec], match: () => null }),
+    })
+    const res = await explore('/root', { screens: ['/other'] }, deps)
+    expect(inferCandidateTables).toHaveBeenCalled()
+    expect(res.specDriven).toBe(0)
+  })
+
+  it('orders screens by the injected dependency order and resolves FK values before building the form', async () => {
+    const order = vi.fn((screens: string[]) => [...screens].reverse())
+    const resolveFk = vi.fn(async (inputs: typeof screenSpec.submits.inputs) =>
+      inputs.map((i) => ({ ...i, value: '42' })),
+    )
+    const toBaseline = vi.fn(() => ({ '[name="age"]': '42' }))
+    const deps = baseDeps({ screenSpecs: specDeps({ order, resolveFk, toBaseline }) })
+    await explore('/root', { screens: ['/a', '/user/create'] }, deps)
+    expect(order).toHaveBeenCalledWith(['/a', '/user/create'], [screenSpec])
+    expect(resolveFk).toHaveBeenCalledWith(screenSpec.submits.inputs)
+    // toBaseline received the FK-resolved spec
+    const baselineArg = toBaseline.mock.calls[0][0] as typeof screenSpec
+    expect(baselineArg.submits?.inputs[0].value).toBe('42')
+  })
+
+  it('appends display-check findings and counts them in the result', async () => {
+    const checkDisplays = vi.fn(async () => [
+      { category: 'layout' as const, severity: 'low' as const, title: '表示項目未確認: /user/create 「年齢」', detail: 'd', evidence: 'e' },
+    ])
+    const deps = baseDeps({ screenSpecs: specDeps({ checkDisplays }) })
+    const res = await explore('/root', { screens: ['/user/create'] }, deps)
+    expect(checkDisplays).toHaveBeenCalledOnce()
+    expect(res.displayIssues).toBe(1)
+    expect(res.findings.some((f) => f.category === 'layout')).toBe(true)
+  })
+
+  it('degrades to live discovery when spec loading throws', async () => {
+    const discoverForms = vi.fn(async () => [form])
+    const deps = baseDeps({
+      discoverForms,
+      screenSpecs: specDeps({ load: async () => { throw new Error('corrupt index') } }),
+    })
+    const res = await explore('/root', { screens: ['/user/create'] }, deps)
+    expect(discoverForms).toHaveBeenCalledWith(expect.anything(), deps.target, ['/user/create'])
+    expect(res.forms).toBe(1)
+    expect(res.specDriven).toBe(0)
+  })
 })

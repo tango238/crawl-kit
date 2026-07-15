@@ -92,6 +92,10 @@ export async function runExplore(cwd: string, opts: RunExploreOpts, deps: RunExp
   const { loadRouteInventory } = await import('../../services/explore/routeInventory.js')
   const { loadCoverageStore, updateCoverage, saveCoverageStore } = await import('../../services/explore/routeCoverage.js')
   const { buildSession, saveSession, loadLatestSession } = await import('../../services/explore/session.js')
+  const { loadScreenSpecs, specForScreen } = await import('../../services/screens/spec.js')
+  const { specToForm, specToConstraints, specBaseline, resolveFkInputs, orderScreensByDependency } =
+    await import('../../services/screens/specExplore.js')
+  const { checkDisplays } = await import('../../services/screens/displayCheck.js')
 
   // Route-inventory source: CLI flags override the config; either present ⇒ that source wins.
   const routesCfg = {
@@ -154,6 +158,17 @@ export async function runExplore(cwd: string, opts: RunExploreOpts, deps: RunExp
       }),
       discoverForms: (page, t, screens) => discoverForms(page, t, screens),
       expandScreenPrefixes: (page, t, prefixes) => expandScreenPrefixes(page, t, prefixes),
+      // ScreenSpec-driven exploration: spec-covered screens run without browser-time LLM.
+      screenSpecs: {
+        load: loadScreenSpecs,
+        match: specForScreen,
+        toForm: specToForm,
+        toConstraints: specToConstraints,
+        toBaseline: specBaseline,
+        resolveFk: db ? (inputs) => resolveFkInputs(inputs, db) : undefined,
+        order: orderScreensByDependency,
+        checkDisplays,
+      },
       // Route coverage + session save/replay (.e2e/explore/): inventory → covered marks → session log.
       loadRouteInventory: (root) => loadRouteInventory(root, routesCfg),
       getTransactions: async () => {
