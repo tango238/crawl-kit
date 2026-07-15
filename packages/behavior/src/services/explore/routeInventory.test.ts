@@ -20,6 +20,23 @@ describe('parseRoutesText', () => {
     ])
   })
 
+  it('prefixes OpenAPI paths with the first server url\'s base path (real requests hit base+path)', () => {
+    const text = JSON.stringify({
+      servers: [{ url: 'https://api.example.com/api' }, { url: 'https://staging.example.com/other' }],
+      paths: { '/v2/plans': { get: {} } },
+    })
+    expect(parseRoutesText(text)).toEqual([{ method: 'GET', path: '/api/v2/plans' }])
+  })
+
+  it('handles a relative OpenAPI server url and a bare-origin server url', () => {
+    expect(parseRoutesText(JSON.stringify({ servers: [{ url: '/api' }], paths: { '/x': { get: {} } } })))
+      .toEqual([{ method: 'GET', path: '/api/x' }])
+    expect(parseRoutesText(JSON.stringify({ servers: [{ url: 'https://api.example.com' }], paths: { '/x': { get: {} } } })))
+      .toEqual([{ method: 'GET', path: '/x' }])
+    expect(parseRoutesText(JSON.stringify({ paths: { '/x': { get: {} } } })))
+      .toEqual([{ method: 'GET', path: '/x' }])
+  })
+
   it('parses Laravel route:list json, splitting method and dropping HEAD/OPTIONS', () => {
     const text = JSON.stringify([
       { method: 'GET|HEAD', uri: 'orders' },

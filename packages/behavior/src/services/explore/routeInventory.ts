@@ -36,13 +36,29 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
 }
 
-/** OpenAPI `paths` object → one entry per (path, HTTP method) present. */
-function parseOpenApi(paths: Record<string, unknown>): { method: string; path: string }[] {
+/**
+ * Base path from the first OpenAPI server url — its pathname, '' when absent, unparseable, or '/'.
+ * Real requests hit `<server base path><path>` (e.g. servers[0] "https://api.example.com/api" +
+ * path "/v2/plans" ⇒ "/api/v2/plans"), so ignoring it would leave every route unmatched.
+ */
+function openApiBasePath(doc: Record<string, unknown>): string {
+  const servers = doc.servers
+  if (!Array.isArray(servers) || !isRecord(servers[0]) || typeof servers[0].url !== 'string') return ''
+  try {
+    const p = new URL(servers[0].url, 'http://relative-server.invalid').pathname
+    return p === '/' ? '' : p.replace(/\/$/, '')
+  } catch {
+    return ''
+  }
+}
+
+/** OpenAPI `paths` object → one entry per (path, HTTP method) present, under the server base path. */
+function parseOpenApi(paths: Record<string, unknown>, basePath: string): { method: string; path: string }[] {
   const out: { method: string; path: string }[] = []
   for (const [path, ops] of Object.entries(paths)) {
     if (!isRecord(ops)) continue
     for (const m of OPENAPI_METHODS) {
-      if (m in ops) out.push({ method: m.toUpperCase(), path })
+      if (m in ops) out.push({ method: m.toUpperCase(), path: `${basePath}${withLeadingSlash(path)}` })
     }
   }
   return out
@@ -80,7 +96,7 @@ export function parseRoutesText(text: string): { method: string; path: string }[
       .map(splitMethodPath)
   }
 
-  if (isRecord(parsed) && isRecord(parsed.paths)) return parseOpenApi(parsed.paths)
+  if (isRecord(parsed) && isRecord(parsed.paths)) return parseOpenApi(parsed.paths, openApiBasePath(parsed))
   if (Array.isArray(parsed)) {
     if (parsed.every((e) => typeof e === 'string')) return (parsed as string[]).map(splitMethodPath)
     if (parsed.every((e) => isRecord(e) && 'method' in e && 'uri' in e)) {
