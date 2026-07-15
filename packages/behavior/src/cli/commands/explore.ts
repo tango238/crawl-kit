@@ -6,6 +6,14 @@ import type { Config } from '../../config/schema.js'
 import type { Secrets, TargetEnv } from '../../domain/types.js'
 import type { BrowserLike } from '../../services/browser/crawler.js'
 
+/** Pipeline opts plus wiring-level overrides for the coverage route inventory. */
+export type RunExploreOpts = ExploreOpts & {
+  /** Override config.explore.routes.file for this run. */
+  routesFile?: string
+  /** Override config.explore.routes.command for this run. */
+  routesCommand?: string
+}
+
 export type RunExploreDeps = {
   loadConfig: (cwd: string) => Promise<{ config: Config; secrets: Secrets }>
   explore: (root: string, opts: ExploreOpts, deps: ExploreDeps) => Promise<ExploreResult>
@@ -23,7 +31,7 @@ function resolveCreds(secrets: Secrets, auth: NonNullable<Config['targets'][numb
 }
 
 /** Resolve config/target/creds/db and invoke the explore pipeline with real deps. */
-export async function runExplore(cwd: string, opts: ExploreOpts, deps: RunExploreDeps): Promise<ExploreResult> {
+export async function runExplore(cwd: string, opts: RunExploreOpts, deps: RunExploreDeps): Promise<ExploreResult> {
   const { config, secrets } = await deps.loadConfig(cwd)
 
   const selected = opts.target
@@ -81,6 +89,16 @@ export async function runExplore(cwd: string, opts: ExploreOpts, deps: RunExplor
   const { prepare } = await import('../../pipeline/prepare.js')
   const { seedDatabase } = await import('../../services/seed/seed.js')
   const { defaultComposeRunner } = await import('../../services/compose/compose.js')
+  const { loadRouteInventory } = await import('../../services/explore/routeInventory.js')
+  const { loadCoverageStore, updateCoverage, saveCoverageStore } = await import('../../services/explore/routeCoverage.js')
+  const { buildSession, saveSession, loadLatestSession } = await import('../../services/explore/session.js')
+
+  // Route-inventory source: CLI flags override the config; either present ⇒ that source wins.
+  const routesCfg = {
+    ...(config.explore?.routes ?? {}),
+    ...(opts.routesFile ? { file: opts.routesFile, command: undefined } : {}),
+    ...(opts.routesCommand && !opts.routesFile ? { command: opts.routesCommand, file: undefined } : {}),
+  }
 
   const browserCtx = await deps.launchBrowser()
   try {
@@ -89,8 +107,11 @@ export async function runExplore(cwd: string, opts: ExploreOpts, deps: RunExplor
     // "2xx accepted" signal. Attached per page; explore drives a single page.
     let lastStatus: number | undefined
     // Record every same-origin API req/res of this explore run to jsonl (masked+capped).
+    // The same runId is passed to the pipeline so the session/coverage artifacts and the
+    // transactions jsonl of one run share a key.
+    const runId = `explore-${new Date().toISOString().replace(/[:.]/g, '-')}`
     const recorder = createRecorder({
-      runId: `explore-${new Date().toISOString().replace(/[:.]/g, '-')}`,
+      runId,
       root: cwd,
       baseUrl: target.baseUrl,
       secrets: allSecrets,
@@ -132,6 +153,19 @@ export async function runExplore(cwd: string, opts: ExploreOpts, deps: RunExplor
       }),
       discoverForms: (page, t, screens) => discoverForms(page, t, screens),
       expandScreenPrefixes: (page, t, prefixes) => expandScreenPrefixes(page, t, prefixes),
+      // Route coverage + session save/replay (.e2e/explore/): inventory → covered marks → session log.
+      loadRouteInventory: (root) => loadRouteInventory(root, routesCfg),
+      getTransactions: () => recorder.transactions(),
+      loadLatestSession,
+      saveCoverage: async (root, inventory, txs, coverageRunId) => {
+        const prev = await loadCoverageStore(root)
+        const { store, summary } = updateCoverage(prev, inventory, txs, coverageRunId, new Date().toISOString())
+        await saveCoverageStore(root, store)
+        return summary
+      },
+      saveSession: async (root, args) => {
+        await saveSession(root, buildSession({ ...args, target: { name: target.name, baseUrl: target.baseUrl } }))
+      },
       inferCandidateTables,
       introspectTable,
       modelConstraints,
@@ -150,6 +184,7 @@ export async function runExplore(cwd: string, opts: ExploreOpts, deps: RunExplor
       appendActivity,
       prepare,
       seedDatabase: (seed, root, s) => seedDatabase(seed, root, defaultComposeRunner, s),
+      runId,
     })
     logger.info({ result: { forms: result.forms, cases: result.cases } }, 'explore complete')
     return result

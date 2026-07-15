@@ -1,6 +1,7 @@
 import type { ExploreDeps } from '../../pipeline/explore.js'
 import type { Config } from '../../config/schema.js'
 import type { Secrets, TargetEnv } from '../../domain/types.js'
+import type { ApiTransaction } from '../../domain/transaction.js'
 import type { PageLike } from '../../services/browser/crawler.js'
 import type { Llm } from '../../services/llm/client.js'
 import type { FindingsEntry, ActivityEntry } from '../../state/findings.js'
@@ -21,6 +22,8 @@ export type BuildExploreDepsInput = {
   getAuthedContext: () => Promise<AuthedContextLike>
   /** Attach the run's request/response recorder to a freshly created explore page. */
   attachRecorder: (page: PageLike) => void
+  /** This run's recorded transactions so far (from the shared recorder) — feeds route coverage. */
+  getTransactions?: () => ApiTransaction[]
 }
 
 /**
@@ -42,6 +45,9 @@ export async function buildExploreDeps(input: BuildExploreDepsInput): Promise<Ex
   const { createDbAdapter } = await import('../../services/db/index.js')
   const { seedDatabase } = await import('../../services/seed/seed.js')
   const { defaultComposeRunner } = await import('../../services/compose/compose.js')
+  const { loadRouteInventory } = await import('../../services/explore/routeInventory.js')
+  const { loadCoverageStore, updateCoverage, saveCoverageStore } = await import('../../services/explore/routeCoverage.js')
+  const { buildSession, saveSession, loadLatestSession } = await import('../../services/explore/session.js')
 
   const dbConf = input.config.databases[0]
   const dbType: 'postgres' | 'mysql' = (dbConf?.type as 'postgres' | 'mysql') ?? 'postgres'
@@ -77,6 +83,24 @@ export async function buildExploreDeps(input: BuildExploreDepsInput): Promise<Ex
     authenticate: async () => ({ ok: true, detail: 'reusing shared authenticated session', finalUrl: input.exploreTarget.baseUrl }),
     discoverForms: (page, t, screens) => discoverForms(page, t, screens),
     expandScreenPrefixes: (page, t, prefixes) => expandScreenPrefixes(page, t, prefixes),
+    // Route coverage + session save/replay — mirrors cli/commands/explore.ts's wiring. The
+    // transactions come from run's SHARED recorder (collect/login/explore stages all count:
+    // any observed operation covers its route).
+    loadRouteInventory: (root) => loadRouteInventory(root, input.config.explore?.routes),
+    getTransactions: input.getTransactions,
+    loadLatestSession,
+    saveCoverage: async (root, inventory, txs, coverageRunId) => {
+      const prev = await loadCoverageStore(root)
+      const { store, summary } = updateCoverage(prev, inventory, txs, coverageRunId, new Date().toISOString())
+      await saveCoverageStore(root, store)
+      return summary
+    },
+    saveSession: async (root, args) => {
+      await saveSession(root, buildSession({
+        ...args,
+        target: { name: input.exploreTarget.name, baseUrl: input.exploreTarget.baseUrl },
+      }))
+    },
     inferCandidateTables,
     introspectTable,
     modelConstraints,

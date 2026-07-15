@@ -138,8 +138,9 @@ program
   .option('--screen <path...>', 'Screen path(s) for --explore (falls back to config.explore.screens)')
   .option('--screen-prefix <path...>', 'Listing screen(s) for --explore to expand one level (falls back to config.explore.screenPrefixes)')
   .option('--no-reseed', 'With --explore: do not re-seed the DB afterward (skips the dev-guard)')
+  .option('--no-replay', 'With --explore: do not replay the previous session\'s screens as explore targets')
   .option('--no-report', 'Write findings to the store only; aggregate later with `loop-e2e report`')
-  .action(async (opts: { target?: string; skipPrepare?: boolean; skipScenarios?: boolean; explore?: boolean; screen?: string[]; screenPrefix?: string[]; reseed?: boolean; report?: boolean }) => {
+  .action(async (opts: { target?: string; skipPrepare?: boolean; skipScenarios?: boolean; explore?: boolean; screen?: string[]; screenPrefix?: string[]; reseed?: boolean; replay?: boolean; report?: boolean }) => {
     const cwd = process.cwd()
 
     let config: import('../config/schema.js').Config
@@ -338,8 +339,9 @@ program
               appendActivity,
               getAuthedContext,
               attachRecorder: (page) => recorder.attach(page as unknown as RecorderPage, 'explore'),
+              getTransactions: () => recorder.transactions(),
             })
-            return explore(root, { target: selectedTarget.name, screens: exploreScreens, screenPrefixes: exploreScreenPrefixes, skipPrepare: true, noReseed: true }, deps)
+            return explore(root, { target: selectedTarget.name, screens: exploreScreens, screenPrefixes: exploreScreenPrefixes, skipPrepare: true, noReseed: true, noReplay: opts.replay === false }, deps)
           }
         : undefined
 
@@ -612,8 +614,11 @@ program
   .option('--screen-prefix <path...>', 'Listing screen(s) to expand one level (same-prefix links become explore targets)')
   .option('--skip-prepare', 'Skip the pre-run prepare phase (repo refresh + setup hooks)')
   .option('--no-reseed', 'Do not re-seed the database after the run (skips the dev-guard)')
+  .option('--no-replay', 'Do not replay the previous session\'s screens as explore targets')
+  .option('--routes-file <path>', 'Expected-routes file for coverage (OpenAPI / Laravel route:list JSON / "METHOD /path" lines; overrides config.explore.routes)')
+  .option('--routes-command <cmd>', 'Command whose stdout is the expected-routes list (overrides config.explore.routes)')
   .option('--no-report', 'Write findings to the store only; aggregate later with `loop-e2e report`')
-  .action(async (opts: { target?: string; screen?: string[]; screenPrefix?: string[]; skipPrepare?: boolean; reseed?: boolean; report?: boolean }) => {
+  .action(async (opts: { target?: string; screen?: string[]; screenPrefix?: string[]; skipPrepare?: boolean; reseed?: boolean; replay?: boolean; routesFile?: string; routesCommand?: string; report?: boolean }) => {
     const cwd = process.cwd()
     const { runExplore } = await import('./commands/explore.js')
     const { explore } = await import('../pipeline/explore.js')
@@ -627,6 +632,9 @@ program
           screenPrefixes: opts.screenPrefix ?? [],
           skipPrepare: opts.skipPrepare,
           noReseed: opts.reseed === false,
+          noReplay: opts.replay === false,
+          routesFile: opts.routesFile,
+          routesCommand: opts.routesCommand,
         },
         {
           loadConfig,
@@ -645,6 +653,13 @@ program
           `gaps ${result.gapsHigh + result.gapsMedium} (high ${result.gapsHigh}/medium ${result.gapsMedium}) / ` +
           `message-issues ${result.messageIssues}\n`,
       )
+      if (result.coverage) {
+        const pct = (result.coverage.ratio * 100).toFixed(1)
+        process.stdout.write(
+          `explore: route coverage ${result.coverage.covered}/${result.coverage.total} (${pct}%) — ` +
+            `+${result.coverage.newlyCovered} new → ${STATE_DIR}/explore/coverage.md\n`,
+        )
+      }
       // Aggregate into a report unless --no-report (then run `loop-e2e report` later).
       if (opts.report === false) {
         process.stdout.write('explore: findings written to the store. Aggregate later with `loop-e2e report`.\n')

@@ -94,12 +94,30 @@ const CrawlSchema = z.object({
 /** Fallback used when the config omits a `crawl` section entirely (so discovery still runs). */
 export const DEFAULT_CRAWL = { maxPages: 10, maxDepth: 3, excludePaths: [] as string[] }
 
+/**
+ * Expected-route inventory source for explore coverage (the denominator). `file`/`command` accept
+ * OpenAPI JSON, Laravel `route:list --json`, a JSON string array, or plain "METHOD /path" lines
+ * (auto-detected). Neither set ⇒ falls back to the structure spine under `<root>/data`.
+ */
+const ExploreRoutesSchema = z.object({
+  /** Routes file, relative to the workspace root (or absolute). */
+  file: z.string().min(1).optional(),
+  /** Shell command whose stdout is the routes list (run from the workspace root). */
+  command: z.string().min(1).optional(),
+  /** Path prefixes to keep (empty ⇒ all). */
+  include: z.array(z.string().min(1)).default([]),
+  /** Path prefixes to drop (wins over include). */
+  exclude: z.array(z.string().min(1)).default([]),
+})
+
 /** Exploratory input verification integrated into `run` (run --explore). */
 const ExploreSchema = z.object({
   /** Default screen paths to explore when `run --explore` is given no --screen flags. */
   screens: z.array(z.string().min(1)).default([]),
   /** Default listing screens to expand one level when given no --screen-prefix flags. */
   screenPrefixes: z.array(z.string().min(1)).default([]),
+  /** Expected-route inventory for coverage tracking (.e2e/explore/coverage.*). */
+  routes: ExploreRoutesSchema.optional(),
 })
 
 export const ConfigSchema = z.object({
@@ -127,6 +145,7 @@ export type DbConfig = z.infer<typeof DbSchema>
 export type Grow = z.infer<typeof GrowSchema>
 export type Crawl = z.infer<typeof CrawlSchema>
 export type Explore = z.infer<typeof ExploreSchema>
+export type ExploreRoutes = z.infer<typeof ExploreRoutesSchema>
 export const CONFIG_FILENAME = 'e2e.config.yaml'
 
 // ── workspace mode ───────────────────────────────────────────────────────────

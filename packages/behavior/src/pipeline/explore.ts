@@ -10,6 +10,10 @@ import type {
   DiscoveredForm, ColumnDef, FieldConstraint, InputCase, CaseOutcome, Baseline, GapVerdict, QualityFinding,
 } from '../services/explore/types.js'
 import type { ExploreExecDeps } from '../services/explore/execute.js'
+import type { ApiTransaction } from '../domain/transaction.js'
+import type { RouteInventory } from '../services/explore/routeInventory.js'
+import type { CoverageSummary } from '../services/explore/routeCoverage.js'
+import type { ExploreSession } from '../services/explore/session.js'
 
 export type ExploreOpts = {
   target?: string
@@ -18,6 +22,8 @@ export type ExploreOpts = {
   screenPrefixes?: string[]
   skipPrepare?: boolean
   noReseed?: boolean
+  /** Skip merging the previous session's screens into this run's explore targets. */
+  noReplay?: boolean
 }
 
 export type ExploreResult = {
@@ -27,6 +33,8 @@ export type ExploreResult = {
   gapsHigh: number
   gapsMedium: number
   messageIssues: number
+  /** Route coverage after this run (undefined when no inventory/coverage deps are wired). */
+  coverage?: CoverageSummary
 }
 
 /** All external I/O is injected. `reportDeps` is everything writeReport needs except findings. */
@@ -59,6 +67,21 @@ export type ExploreDeps = {
   llm: Llm
   sourceRules?: string
   execDeps?: ExploreExecDeps
+
+  // ── Route coverage + session save/replay (all optional — absent ⇒ feature off) ──
+  /** Expected-route inventory (the coverage denominator), pre-enumerated from the app's routing. */
+  loadRouteInventory?: (root: string) => Promise<RouteInventory | null>
+  /** This run's recorded same-origin transactions (from the attached recorder). */
+  getTransactions?: () => ApiTransaction[]
+  /** Previous run's session — its screens are replayed as explore targets unless opts.noReplay. */
+  loadLatestSession?: (root: string) => Promise<ExploreSession | null>
+  /** Merge this run's matches into the cumulative coverage store (.e2e/explore/coverage.*). */
+  saveCoverage?: (root: string, inventory: RouteInventory, txs: ApiTransaction[], runId: string) => Promise<CoverageSummary>
+  /** Persist this run's per-screen req/res session log (.e2e/explore/sessions/). */
+  saveSession?: (
+    root: string,
+    args: { runId: string; startedAt: string; screens: string[]; txs: ApiTransaction[] },
+  ) => Promise<void>
 
   /** Persist findings to the shared store (the `report` command aggregates them) */
   writeFindings: (root: string, entry: FindingsEntry) => Promise<void>
@@ -109,6 +132,7 @@ export async function explore(root: string, opts: ExploreOpts, deps: ExploreDeps
 
   const secrets = deps.secrets ?? []
   const runId = deps.runId ?? new Date().toISOString().replace(/[:.]/g, '-')
+  const startedAt = new Date().toISOString()
 
   // Stage 0: prepare (repo refresh + setup hooks).
   if (!opts.skipPrepare && deps.prepare && deps.config) {
@@ -126,13 +150,19 @@ export async function explore(root: string, opts: ExploreOpts, deps: ExploreDeps
     }
 
     // Stage 2: discover forms. Explicit screens, plus (when both a non-empty screenPrefixes and the
-    // expandScreenPrefixes dep are given) their depth-1 link expansion — deduped, explicit first.
+    // expandScreenPrefixes dep are given) their depth-1 link expansion, plus (unless --no-replay)
+    // the previous session's screens — deduped, explicit first.
     const explicitScreens = opts.screens ?? []
     const expandedScreens =
       opts.screenPrefixes && opts.screenPrefixes.length > 0 && deps.expandScreenPrefixes
         ? await deps.expandScreenPrefixes(page, deps.target, opts.screenPrefixes)
         : []
-    const screens = Array.from(new Set([...explicitScreens, ...expandedScreens]))
+    const replayedScreens =
+      !opts.noReplay && deps.loadLatestSession ? ((await deps.loadLatestSession(root))?.screens ?? []) : []
+    if (replayedScreens.length > 0) {
+      logger.info({ count: replayedScreens.length }, 'explore: replaying screens from the previous session')
+    }
+    const screens = Array.from(new Set([...explicitScreens, ...expandedScreens, ...replayedScreens]))
     const forms = await deps.discoverForms(page, deps.target, screens)
 
     const findings: VerifyFinding[] = []
@@ -190,8 +220,36 @@ export async function explore(root: string, opts: ExploreOpts, deps: ExploreDeps
       }
     }
 
+    // Stage 2.5: route coverage + session log. Coverage marks inventory routes hit by this run's
+    // recorded traffic (cumulative across runs); the session log saves per-screen req/res data and
+    // doubles as the next run's replay source. Both are best-effort — never fail the run.
+    let coverage: CoverageSummary | undefined
+    const txs = deps.getTransactions?.() ?? []
+    if (deps.loadRouteInventory && deps.saveCoverage) {
+      try {
+        const inventory = await deps.loadRouteInventory(root)
+        if (inventory) {
+          coverage = await deps.saveCoverage(root, inventory, txs, runId)
+          logger.info(
+            { total: coverage.total, covered: coverage.covered, newlyCovered: coverage.newlyCovered },
+            'explore: route coverage updated',
+          )
+        } else {
+          logger.warn({ root }, 'explore: no route inventory found — coverage skipped (configure explore.routes or run structure analysis)')
+        }
+      } catch (err) {
+        logger.warn({ err: String(err) }, 'explore: coverage tracking failed — continuing')
+      }
+    }
+    if (deps.saveSession && txs.length > 0) {
+      try {
+        await deps.saveSession(root, { runId, startedAt, screens, txs })
+      } catch (err) {
+        logger.warn({ err: String(err) }, 'explore: session save failed — continuing')
+      }
+    }
+
     // Stage 3: persist findings to the shared store (reporting is the separate `report` step).
-    const startedAt = new Date().toISOString()
     await deps.writeFindings(root, { source: 'explore', runId, startedAt, diffFindings: [], verifyFindings: findings })
     if (deps.appendActivity) {
       await deps.appendActivity(root, {
@@ -205,7 +263,7 @@ export async function explore(root: string, opts: ExploreOpts, deps: ExploreDeps
       await deps.seedDatabase(deps.seed, root, secrets)
     }
 
-    return { findings, forms: forms.length, cases, gapsHigh, gapsMedium, messageIssues }
+    return { findings, forms: forms.length, cases, gapsHigh, gapsMedium, messageIssues, coverage }
   } finally {
     await page.close?.().catch(() => {})
   }

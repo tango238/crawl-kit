@@ -22,6 +22,7 @@ describe('buildExploreDeps', () => {
       appendActivity: vi.fn(async () => {}),
       getAuthedContext: async () => ({ newPage: async () => page }),
       attachRecorder: vi.fn(),
+      getTransactions: () => [],
     })
 
     // Pinning the wiring: run --explore silently dropped screen-prefix expansion because
@@ -32,6 +33,13 @@ describe('buildExploreDeps', () => {
     expect(typeof deps.runCase).toBe('function')
     expect(deps.target).toBe(target)
     expect(deps.creds).toEqual({ username: 'u', password: 'p' })
+    // Coverage/session deps guard the same silent-drop failure mode (pipeline skips the
+    // feature when a dep is absent), so pin them onto the built object too.
+    expect(typeof deps.loadRouteInventory).toBe('function')
+    expect(typeof deps.loadLatestSession).toBe('function')
+    expect(typeof deps.saveCoverage).toBe('function')
+    expect(typeof deps.saveSession).toBe('function')
+    expect(deps.getTransactions?.()).toEqual([])
   })
 
   it('createPage tracks the last mutating-request status via execDeps.getLastStatus', async () => {

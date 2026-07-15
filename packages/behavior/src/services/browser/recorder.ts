@@ -30,7 +30,14 @@ export type RecRequest = {
 export type RecorderPage = {
   on(event: 'requestfinished' | 'requestfailed', cb: (req: RecRequest) => void): void
 }
-export type Recorder = { attach(page: RecorderPage, stage: RecordStage): void; path: string }
+export type Recorder = {
+  attach(page: RecorderPage, stage: RecordStage): void
+  path: string
+  /** Every tx recorded this process, in record order — a copy, so callers can't mutate the
+   *  collector. Populated in-memory as each tx is built (before the async file append), so it
+   *  never depends on fs success. Downstream: route-coverage + session log for the explore run. */
+  transactions(): ApiTransaction[]
+}
 
 const API_TYPES = new Set(['xhr', 'fetch', 'document'])
 export function isApiResourceType(t: string): boolean {
@@ -74,6 +81,7 @@ export function createRecorder(opts: RecorderOptions): Recorder {
   const path = join(statePaths(opts.root).runs, `${opts.runId}${TRANSACTIONS_SUFFIX}`)
   let seq = 0
   let ensured = false
+  const collected: ApiTransaction[] = []
 
   const mask = (s: string): string => maskSecrets(s, opts.secrets)
 
@@ -146,6 +154,8 @@ export function createRecorder(opts: RecorderOptions): Recorder {
         errorText: errText || undefined,
         pageUrl,
       }
+      // Collect in-memory before the fs append so the getter never depends on write success.
+      collected.push(tx)
       await write(tx)
     } catch (err) {
       logger.warn({ err: String(err) }, 'recorder: record failed — continuing')
@@ -158,6 +168,7 @@ export function createRecorder(opts: RecorderOptions): Recorder {
       page.on('requestfinished', (req) => void record(req, stage, false))
       page.on('requestfailed', (req) => void record(req, stage, true))
     },
+    transactions: () => collected.slice(),
   }
 }
 
