@@ -98,6 +98,28 @@ describe('createRecorder', () => {
     expect(await lines(rec.path)).toHaveLength(0)
   })
 
+  it('records requests to configured extraOrigins (SPA calling an API on another origin)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rec-'))
+    const rec = createRecorder({
+      runId: 'r', root, baseUrl: 'https://admin.app.test', extraOrigins: ['https://api.app.test'], secrets: [],
+    })
+    const page = fakePage()
+    rec.attach(page as any, 'explore')
+    page.emitFinished(req({
+      url: () => 'https://api.app.test/api/v2/plans',
+      method: () => 'GET',
+      postData: () => null,
+      frame: () => ({ url: () => 'https://admin.app.test/plans' }),
+    }))
+    page.emitFinished(req({ url: () => 'https://unrelated.test/x', resourceType: () => 'fetch' }))
+    await new Promise((r) => setTimeout(r, 10))
+    const rows = await lines(rec.path)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].path).toBe('/api/v2/plans')
+    // pageUrl stays baseUrl-scoped: the owning screen is the SPA page
+    expect(rows[0].pageUrl).toBe('https://admin.app.test/plans')
+  })
+
   it('records a failed request with failed=true', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rec-'))
     const rec = createRecorder({ runId: 'r', root, baseUrl: 'http://app.test', secrets: [] })

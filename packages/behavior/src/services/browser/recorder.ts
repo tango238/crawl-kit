@@ -11,6 +11,10 @@ export type RecorderOptions = {
   runId: string
   root: string
   baseUrl: string
+  /** Additional origins to record beyond baseUrl's — for SPAs whose API lives on another origin
+   *  (e.g. app on admin.example.com calling api.example.com). Page context (pageUrl) stays
+   *  baseUrl-scoped: screens belong to the app, only the traffic fans out. */
+  extraOrigins?: string[]
   secrets: string[]
   bodyCapBytes?: number
 }
@@ -50,6 +54,12 @@ export function sameOrigin(url: string, baseUrl: string): boolean {
   } catch {
     return false
   }
+}
+
+/** Is the url's origin one of the recorded origins (baseUrl's own, or an extra API origin)? */
+export function matchesRecordedOrigin(url: string, baseUrl: string, extraOrigins?: string[]): boolean {
+  if (sameOrigin(url, baseUrl)) return true
+  return (extraOrigins ?? []).some((o) => sameOrigin(url, o))
 }
 
 export function capBody(s: string, cap: number): { body: string; truncated: boolean } {
@@ -100,7 +110,7 @@ export function createRecorder(opts: RecorderOptions): Recorder {
   async function record(req: RecRequest, stage: RecordStage, failed: boolean): Promise<void> {
     try {
       const url = req.url()
-      if (!sameOrigin(url, opts.baseUrl)) return
+      if (!matchesRecordedOrigin(url, opts.baseUrl, opts.extraOrigins)) return
       if (!isApiResourceType(req.resourceType())) return
 
       const rawReqBody = req.postData() ?? undefined

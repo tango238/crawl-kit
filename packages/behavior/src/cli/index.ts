@@ -219,11 +219,12 @@ program
       // explained precisely (e.g. "HTTP 422: 登録情報と一致しませんでした") rather than guessed —
       // the app shows such errors as auto-dismissing toasts the DOM scan misses.
       let lastAuthResponse: { status: number; bodyText?: string } | null = null
-      // Record every same-origin API req/res of this run to jsonl (masked+capped).
+      // Record every same-origin (+ configured apiOrigins) API req/res of this run to jsonl (masked+capped).
       const recorder = createRecorder({
         runId: `run-${new Date().toISOString().replace(/[:.]/g, '-')}`,
         root: cwd,
         baseUrl: selectedTarget.baseUrl,
+        extraOrigins: selectedTarget.apiOrigins,
         secrets: allSecrets,
       })
       const createPage = async () => {

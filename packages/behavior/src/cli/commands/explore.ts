@@ -114,6 +114,7 @@ export async function runExplore(cwd: string, opts: RunExploreOpts, deps: RunExp
       runId,
       root: cwd,
       baseUrl: target.baseUrl,
+      extraOrigins: selected.apiOrigins,
       secrets: allSecrets,
     })
     const createPage = async () => {

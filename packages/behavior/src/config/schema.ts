@@ -25,6 +25,9 @@ export const AuthSchema = z.object({
 export const TargetSchema = z.object({
   name: z.string(),
   baseUrl: z.string().url(),
+  /** Additional origins whose requests the recorder captures — for apps whose API lives on a
+   *  different origin than baseUrl (e.g. an admin SPA calling api.example.com). */
+  apiOrigins: z.array(z.string().url()).optional(),
   auth: AuthSchema.optional(),
 })
 
