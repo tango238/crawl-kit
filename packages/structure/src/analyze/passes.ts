@@ -64,6 +64,13 @@ export async function runPasses(
   const passes = opts.passes ?? [1, 2, 3];
 
   const results: PassResult[] = [];
+  // Fragments accumulate ACROSS passes: pass 1 yields the route inventory, later passes yield
+  // detail/cross-unit fragments. Each pass's merged view must fold every fragment so far —
+  // merging only the current pass's fragments drops pass-1 routes from pass ≥2, and the FINAL
+  // pass's merged is what incremental.ts projects into the returned extract (observed in the
+  // field: structure.nodes.json collapsed from 534 nodes to 6). mergeFragments dedupes routes
+  // by normalizeRoute key and unions the rest, so cross-pass accumulation is idempotent-safe.
+  const allFrags: StructureFragment[] = [];
   for (const pass of passes) {
     let done = 0; // completion counter for this pass — incremented in the completion callback so it stays monotonic under concurrent fan-out
     const frags = await Promise.all(
@@ -83,7 +90,8 @@ export async function runPasses(
         }),
       ),
     );
-    const merged = mergeFragments(frags);
+    allFrags.push(...frags);
+    const merged = mergeFragments(allFrags);
     await deps.onPass?.(pass, merged, units);
     results.push({ pass, merged });
   }

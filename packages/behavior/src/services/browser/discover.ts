@@ -1,4 +1,5 @@
 import { logger } from '../../util/logger.js'
+import { waitForClientRender } from './render.js'
 import type { PageLike } from './crawler.js'
 import type { TargetEnv, RawPage, Grow } from '../../domain/types.js'
 
@@ -211,6 +212,8 @@ async function enqueueClickTransitions(
 async function capture(page: PageLike, url: string): Promise<RawPage> {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
   await page.waitForLoadState('networkidle')
+  // Same rationale as crawler.ts capturePage: don't capture the pre-hydration CSR shell.
+  await waitForClientRender(page)
   const finalUrl = page.url()
   const title = await page.title()
   const html = await page.content()

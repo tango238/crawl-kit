@@ -42,6 +42,29 @@ describe("runPasses — fan-out + merge", () => {
     expect(res.passes[0].merged.routes.map((r) => r.path).sort()).toEqual(["/a", "/b"]);
   });
 
+  it("accumulates fragments across passes — a later pass's merged still carries pass-1 routes", async () => {
+    const dir = tmp();
+    // Mirrors the real parser's per-pass scoping: pass 1 yields the route inventory, pass 2
+    // yields detail (a model) and NO routes. The pass-2 merged view — which incremental.ts
+    // projects into the final extract — must still contain the pass-1 routes (regression:
+    // per-pass-only merging dropped them and the emitted node set collapsed).
+    const parse = async (u: Unit, pass: number): Promise<StructureFragment> =>
+      pass === 1
+        ? {
+            ...emptyFragment(u.id, u.hash, pass),
+            routes: [{ method: "GET", path: `/${u.id}`, controller: "", action: "", middleware: [], prefix: "" }],
+          }
+        : {
+            ...emptyFragment(u.id, u.hash, pass),
+            models: [{ className: `${u.id}Model`, tableName: u.id, fillable: [], relationships: [], casts: {}, scopes: [] }],
+          };
+    const units = [unit("a", "h1")];
+    const res = await runPasses("/repo", { passes: [1, 2] }, baseDeps(dir, units, parse));
+    const last = res.passes[res.passes.length - 1].merged;
+    expect(last.routes.map((r) => r.path)).toEqual(["/a"]); // pass-1 routes survive into pass-2's merge
+    expect(last.models.map((m) => m.className)).toEqual(["aModel"]); // pass-2 detail present too
+  });
+
   it("runs multiple passes in order, invoking onPass per pass", async () => {
     const dir = tmp();
     const { parse } = fakeParser();

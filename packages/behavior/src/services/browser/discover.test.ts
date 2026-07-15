@@ -105,6 +105,35 @@ describe('discoverPages', () => {
   })
 })
 
+describe('discoverPages — CSR shell settles before capture', () => {
+  it('waits out a late-hydrating root page so its links still feed BFS', async () => {
+    // The root serves the pre-hydration empty shell for the first content() samples, then the
+    // hydrated DOM — mirroring a Next.js page that passes networkidle before client render.
+    // Pre-fix, the shell (zero links) was captured and discovery stopped at depth 0.
+    let serves = 0
+    let url = ''
+    const shell = '<html><head><title>app</title></head><body><div id="__next"></div></body></html>'
+    const page = {
+      goto: vi.fn(async (u: string) => { url = u; serves = 0 }),
+      url: vi.fn(() => url),
+      title: vi.fn(async () => 'app'),
+      content: vi.fn(async () => {
+        const path = new URL(url).pathname.replace(/\/+$/, '') || '/'
+        if (path !== '/') return link('/hotel')
+        serves += 1
+        return serves < 3 ? shell : `<html><body>${link('/hotel')}</body></html>`
+      }),
+      evaluate: vi.fn(async () => ({})),
+      screenshot: vi.fn(async () => {}),
+      waitForLoadState: vi.fn(async () => {}),
+      locator: vi.fn(() => ({ fill: vi.fn(async () => {}), click: vi.fn(async () => {}) })),
+    } as unknown as PageLike
+    const pages = await discoverPages(page, target, grow)
+    const paths = pages.map((p) => new URL(p.url).pathname.replace(/\/+$/, '') || '/')
+    expect(paths).toContain('/hotel')
+  })
+})
+
 describe('isDestructiveLabel', () => {
   it('flags destructive / side-effecting labels (EN + JA)', () => {
     for (const l of ['Logout', 'Sign out', 'Delete', 'Remove item', 'Submit', 'Save', 'Update', '削除', 'ログアウト', '送信', '保存']) {

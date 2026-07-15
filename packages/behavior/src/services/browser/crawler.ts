@@ -2,6 +2,7 @@ import { ensureDir } from '../../util/fs.js'
 import { logger } from '../../util/logger.js'
 import { screenshot } from './snapshot.js'
 import { discoverPages, normalizeUrl } from './discover.js'
+import { waitForClientRender } from './render.js'
 import type { NavEdge } from './discover.js'
 import type { RawPage, TargetEnv } from '../../domain/types.js'
 import type { Crawl } from '../../config/schema.js'
@@ -96,6 +97,9 @@ function resolveUrl(stepTarget: string, baseUrl: string): string {
 async function capturePage(page: PageLike, url: string, screenshotDir: string): Promise<RawPage> {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
   await page.waitForLoadState('networkidle')
+  // CSR SPAs can pass networkidle before hydration renders anything — without this wait the
+  // captured HTML is an empty shell (zero links) and BFS starves at depth 0.
+  await waitForClientRender(page)
 
   const finalUrl = page.url()
   const title = await page.title()

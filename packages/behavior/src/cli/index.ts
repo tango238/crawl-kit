@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander'
+import { installUnhandledRejectionGuard } from '../util/unhandledGuard.js'
 import { createRecorder, withRecorder } from '../services/browser/recorder.js'
 import type { RecorderPage } from '../services/browser/recorder.js'
 import { createGithubClient } from '../services/github/client.js'
@@ -743,5 +744,9 @@ program
       process.exit(1)
     }
   })
+
+// One flaky background rejection (e.g. a claude CLI child exiting 1) must not kill a
+// 90-minute crawl — stages report their own failures; see util/unhandledGuard.ts.
+installUnhandledRejectionGuard()
 
 program.parse()

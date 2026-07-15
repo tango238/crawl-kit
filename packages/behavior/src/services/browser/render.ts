@@ -1,11 +1,10 @@
 // CSR-heavy SPAs (e.g. Next.js App Router) can pass 'networkidle' while the client bundle is
 // still hydrating — reading page.content() at that instant yields an empty shell (title only,
-// zero <a href>/<form>), which starves link expansion and form discovery. Proven against a real
-// Next.js admin target: BFS crawl discovery collapsed to a single page on the same pattern.
-//
-// NOTE: an equivalent uncommitted fix exists for the crawl path (browser/discover.ts capture);
-// this module is deliberately a separate file so the two changes never conflict — unify when
-// both land.
+// zero <a href>/<form>), which starves link expansion, form discovery, and BFS crawl capture.
+// Proven against a real Next.js admin target: crawl discovery collapsed to a single page on
+// this pattern (1 → 26 pages once the wait was added). Consumed by the crawl captures
+// (browser/crawler.ts, browser/discover.ts) and the explore captures (explore/expand.ts,
+// explore/discover.ts).
 
 /** The one page capability this wait needs — satisfied by PageLike. */
 type ContentPage = { content(): Promise<string> }
