@@ -1,4 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LlmProvider } from "./llm/provider.js";
 import { parseUnit } from "./scoped-parser.js";
 import type { Unit } from "./units.js";
@@ -68,6 +71,68 @@ describe("parseUnit — pass 2 (detail)", () => {
     expect(frag.controllers[0].methods).toEqual([]); // defaulted
     expect(frag.models[0].tableName).toBe("users");
     expect(frag.refs).toEqual([{ from: "UserController", to: "User", kind: "controller->model" }]);
+  });
+});
+
+describe("parseUnit — pass 1 deterministic laravel route parsing", () => {
+  // Silence the info/warn lines the deterministic path emits.
+  beforeEach(() => {
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  });
+  afterAll(() => vi.restoreAllMocks());
+
+  const withRepo = (files: Record<string, string>): string => {
+    const repo = mkdtempSync(join(tmpdir(), "ck-scoped-"));
+    for (const [rel, content] of Object.entries(files)) {
+      const full = join(repo, rel);
+      mkdirSync(join(full, ".."), { recursive: true });
+      writeFileSync(full, content, "utf8");
+    }
+    return repo;
+  };
+
+  it("parses a laravel routes unit from disk WITHOUT calling the LLM", async () => {
+    const repo = withRepo({
+      "routes/web.php": `<?php
+        Route::group(['prefix' => 'admin'], static function () {
+          Route::get('/users', 'UserController@index');
+          Route::post('/users', 'UserController@store');
+        });
+      `,
+    });
+    const llm = codeLlm("SHOULD NOT BE CALLED");
+    const frag = await parseUnit(unit(), 1, { llm, repoPath: repo });
+    expect(frag.routes.map((r) => `${r.method} ${r.path}`)).toEqual(["GET /admin/users", "POST /admin/users"]);
+    expect(llm.analyzeCodebase).not.toHaveBeenCalled();
+    expect(llm.completeSimple).not.toHaveBeenCalled();
+  });
+
+  it("works offline (llm null) for a routes unit that exists on disk", async () => {
+    const repo = withRepo({ "routes/web.php": `<?php Route::get('/ping', 'C@ping');` });
+    const frag = await parseUnit(unit(), 1, { llm: null, repoPath: repo });
+    expect(frag.routes.map((r) => r.path)).toEqual(["/ping"]);
+  });
+
+  it("falls back to the LLM when deterministic parsing yields zero routes", async () => {
+    const repo = withRepo({ "routes/web.php": `<?php // no routes here` });
+    const llm = codeLlm(JSON.stringify({ routes: [{ method: "GET", path: "/from-llm" }] }));
+    const frag = await parseUnit(unit(), 1, { llm, repoPath: repo });
+    expect(frag.routes.map((r) => r.path)).toEqual(["/from-llm"]);
+    expect(llm.analyzeCodebase).toHaveBeenCalledOnce();
+  });
+
+  it("does NOT use the deterministic path for non-routes laravel units", async () => {
+    const llm = codeLlm(JSON.stringify({ routes: [{ method: "GET", path: "/x" }] }));
+    await parseUnit(unit({ kind: "controllers", id: "laravel:controllers" }), 1, { llm, repoPath: "/repo" });
+    expect(llm.analyzeCodebase).toHaveBeenCalledOnce();
+  });
+
+  it("does NOT use the deterministic path on pass 2", async () => {
+    const repo = withRepo({ "routes/web.php": `<?php Route::get('/ping', 'C@ping');` });
+    const llm = codeLlm(JSON.stringify({ controllers: [] }));
+    await parseUnit(unit(), 2, { llm, repoPath: repo });
+    expect(llm.analyzeCodebase).toHaveBeenCalledOnce();
   });
 });
 
