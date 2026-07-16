@@ -2,7 +2,7 @@ import { ensureDir } from '../../util/fs.js'
 import { logger } from '../../util/logger.js'
 import { screenshot } from './snapshot.js'
 import { discoverPages, normalizeUrl } from './discover.js'
-import { waitForClientRender } from './render.js'
+import { waitForClientRender, settleNetwork } from './render.js'
 import type { NavEdge } from './discover.js'
 import type { RawPage, TargetEnv } from '../../domain/types.js'
 import type { Crawl } from '../../config/schema.js'
@@ -96,7 +96,8 @@ function resolveUrl(stepTarget: string, baseUrl: string): string {
  */
 async function capturePage(page: PageLike, url: string, screenshotDir: string): Promise<RawPage> {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
-  await page.waitForLoadState('networkidle')
+  // Bounded: pages with polling/websocket traffic may never reach Playwright's networkidle.
+  await settleNetwork(page, 10_000)
   // CSR SPAs can pass networkidle before hydration renders anything — without this wait the
   // captured HTML is an empty shell (zero links) and BFS starves at depth 0.
   await waitForClientRender(page)
@@ -227,7 +228,14 @@ export async function crawlWithBrowser(
       const scenarioPageCount = rawPages.length
       // Only concrete paths can be navigated to — a templated `/hotel/:id` is not a real URL.
       const seedPaths = (opts.seedPaths ?? []).filter((p) => !p.includes(':'))
-      const discovered = await discoverPages(page, target, opts.discover, true, opts.onEdge, seedPaths)
+      const discovered = await discoverPages(
+        page,
+        target,
+        opts.discover,
+        opts.discover.clickDiscovery ?? true,
+        opts.onEdge,
+        seedPaths,
+      )
       const seen = new Set(rawPages.map((p) => normalizeUrl(p.url)))
       for (const d of discovered) {
         if (rawPages.length >= opts.discover.maxPages) break

@@ -10,6 +10,23 @@
 type ContentPage = { content(): Promise<string> }
 
 /**
+ * `waitForLoadState('networkidle')` with a hard upper bound. Playwright's networkidle needs a
+ * 500ms gap with zero requests — pages with polling/websocket/analytics traffic may NEVER go
+ * idle, and the unbounded wait rides to the default navigation timeout on every call. Measured
+ * in the field: click-discovery's un-timed idle waits (2 per candidate × up to 12 candidates ×
+ * ~50 pages) accounted for 82% of a 5-hour behavior run. The race never throws.
+ */
+export async function settleNetwork(
+  page: { waitForLoadState(state?: 'domcontentloaded' | 'networkidle' | 'load'): Promise<void> },
+  maxMs: number,
+): Promise<void> {
+  await Promise.race([
+    page.waitForLoadState('networkidle').catch(() => {}),
+    new Promise<void>((r) => setTimeout(r, maxMs)),
+  ])
+}
+
+/**
  * Poll page.content() until the DOM looks rendered: links or a form appear, or the HTML size is
  * stable across consecutive samples (static/link-less pages exit after ~600ms). Bounded by
  * maxMs; never throws.

@@ -65,6 +65,29 @@ describe("runPasses — fan-out + merge", () => {
     expect(last.models.map((m) => m.className)).toEqual(["aModel"]); // pass-2 detail present too
   });
 
+  it("does not cache an empty fragment (swallowed parse failure), so a rerun re-parses and heals", async () => {
+    const dir = tmp();
+    // First run: parse "fails" (empty fragment — how parseUnit reports a swallowed LLM error).
+    // Second run with the SAME unit hash: parse succeeds. Pre-guard, the cached empty was served
+    // and the routes were lost forever.
+    let call = 0;
+    const parse = async (u: Unit, pass: number): Promise<StructureFragment> => {
+      call += 1;
+      return call === 1
+        ? emptyFragment(u.id, u.hash, pass)
+        : {
+            ...emptyFragment(u.id, u.hash, pass),
+            routes: [{ method: "GET", path: "/healed", controller: "", action: "", middleware: [], prefix: "" }],
+          };
+    };
+    const units = [unit("a", "h1")];
+    const first = await runPasses("/repo", { passes: [1] }, baseDeps(dir, units, parse));
+    expect(first.passes[0].merged.routes).toEqual([]);
+    const second = await runPasses("/repo", { passes: [1] }, baseDeps(dir, units, parse));
+    expect(second.passes[0].merged.routes.map((r) => r.path)).toEqual(["/healed"]); // not served from a poisoned cache
+    expect(call).toBe(2);
+  });
+
   it("runs multiple passes in order, invoking onPass per pass", async () => {
     const dir = tmp();
     const { parse } = fakeParser();

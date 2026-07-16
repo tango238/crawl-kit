@@ -92,10 +92,13 @@ const CrawlSchema = z.object({
   maxPages: z.number().int().positive().default(10),
   maxDepth: z.number().int().positive().default(3),
   excludePaths: z.array(z.string()).default([]),
+  /** Probe clickable non-link elements for SPA navigations. Expensive (page reload per candidate);
+   *  disable when the static screen inventory already covers navigation. */
+  clickDiscovery: z.boolean().default(true),
 })
 
 /** Fallback used when the config omits a `crawl` section entirely (so discovery still runs). */
-export const DEFAULT_CRAWL = { maxPages: 10, maxDepth: 3, excludePaths: [] as string[] }
+export const DEFAULT_CRAWL = { maxPages: 10, maxDepth: 3, excludePaths: [] as string[], clickDiscovery: true }
 
 /**
  * Expected-route inventory source for explore coverage (the denominator). `file`/`command` accept

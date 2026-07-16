@@ -52,6 +52,11 @@ export interface RunPassesResult {
 }
 
 /** Run the analysis passes over a repo: enumerate → (per pass) fan-out+diff → merge → emit. */
+/** Nothing extracted at all — either a legitimately bare unit or a swallowed parse failure. */
+function isEmptyFragment(f: StructureFragment): boolean {
+  return f.routes.length === 0 && f.controllers.length === 0 && f.models.length === 0 && f.refs.length === 0;
+}
+
 export async function runPasses(
   repoPath: string,
   opts: RunPassesOpts,
@@ -84,6 +89,16 @@ export async function runPasses(
             }
           }
           const frag = await parse(u, pass, { llm: deps.llm, repoPath, context: opts.context });
+          // Cache-poisoning guard: parseUnit swallows LLM failures into an EMPTY fragment, which
+          // is indistinguishable from "unit legitimately has nothing". Caching such an empty makes
+          // the failure PERMANENT (the hash never changes, so reruns serve the poisoned cache —
+          // observed: a routes file that one run extracted 124 routes from was cached as 0 by the
+          // next). Empties are still merged this run, but never cached, so a rerun re-parses and
+          // can heal. Truly-empty units pay one re-parse per run — the safe direction.
+          if (isEmptyFragment(frag)) {
+            await deps.onUnit?.(pass, u.id, ++done, units.length);
+            return frag;
+          }
           writeFragment(cacheDir, frag);
           await deps.onUnit?.(pass, u.id, ++done, units.length);
           return frag;
