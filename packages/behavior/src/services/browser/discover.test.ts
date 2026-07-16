@@ -105,6 +105,46 @@ describe('discoverPages', () => {
   })
 })
 
+describe('discoverPages — seed scheduling and edge preservation', () => {
+  it('organic BFS outranks seeds: links are followed (and edges recorded) even when seeds exceed the page budget', async () => {
+    // Regression: seeds at the head of the single FIFO queue ate the whole maxPages budget, so
+    // link-derived items were never visited and onEdge NEVER fired (empty edges.json, all-orphan
+    // sitemap). Organic first, seeds back-fill.
+    const page = makePage({
+      '/': link('/a'),
+      '/a': '<html></html>',
+      '/s1': '<html></html>',
+      '/s2': '<html></html>',
+      '/s3': '<html></html>',
+    })
+    const edges: { from: string; to: string }[] = []
+    const pages = await discoverPages(
+      page, target, { ...grow, maxPages: 3 }, false,
+      (e) => edges.push({ from: e.from, to: e.to }),
+      ['/s1', '/s2', '/s3'],
+    )
+    const paths = pages.map((p) => new URL(p.url).pathname.replace(/\/+$/, '') || '/')
+    expect(paths).toEqual(['/', '/a', '/s1']) // organic '/a' beats the remaining seeds
+    expect(edges).toHaveLength(1)
+    expect(new URL(edges[0].to).pathname).toBe('/a')
+  })
+
+  it('records a deduped edge when a link points at an already-visited page (including seeds)', async () => {
+    // '/a' links back to '/' (visited) and to seed '/s1' twice — both edges fire exactly once.
+    const page = makePage({
+      '/': link('/a'),
+      '/a': link('/') + link('/s1') + link('/s1'),
+      '/s1': '<html></html>',
+    })
+    const edges: { from: string; to: string }[] = []
+    await discoverPages(page, target, { ...grow, maxPages: 10 }, false, (e) => edges.push(e), ['/s1'])
+    const pairs = edges.map((e) => `${new URL(e.from).pathname}→${new URL(e.to).pathname.replace(/\/+$/, '') || '/'}`)
+    expect(pairs).toContain('/→/a')
+    expect(pairs.filter((p) => p === '/a→/').length).toBe(1)
+    expect(pairs.filter((p) => p === '/a→/s1').length).toBe(1)
+  })
+})
+
 describe('discoverPages — CSR shell settles before capture', () => {
   it('waits out a late-hydrating root page so its links still feed BFS', async () => {
     // The root serves the pre-hydration empty shell for the first content() samples, then the
