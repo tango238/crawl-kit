@@ -19,6 +19,8 @@ export type RunOpts = {
   explore?: boolean
   /** Screen paths for the explore stage (falls back to config.explore.screens). */
   screens?: string[]
+  /** Listing screens for the explore stage to expand one level (falls back to config.explore.screenPrefixes). */
+  screenPrefixes?: string[]
   /** Skip the final DB re-seed (dev escape hatch; explore writes will NOT be restored). */
   noReseed?: boolean
 }
@@ -98,6 +100,31 @@ export type RunDeps = {
   recrawl?: (ctx: RunContext) => Promise<RawPage[]>
   /** Restore the DB after a destructive explore run. Run owns this when explore ran. */
   reseed?: (root: string) => Promise<void>
+  /**
+   * Static screen inventory (Next.js router scan of the frontend repo) — the denominator for
+   * cumulative screen coverage. Null when there is no frontend repo / it isn't a Next.js app.
+   * Paired with {@link saveScreenCoverage}; both must be set for coverage to run.
+   */
+  screenInventory?: import('../../services/screens/inventory.js').ScreenInventory | null
+  /**
+   * Merge this run's visited page paths into the cumulative screen-coverage store
+   * (.e2e/explore/screen-coverage.*). Best-effort: run wraps it so any failure only logs a warning.
+   */
+  saveScreenCoverage?: (
+    root: string,
+    inventory: import('../../services/screens/inventory.js').ScreenInventory,
+    visitedPaths: string[],
+    runId: string,
+  ) => Promise<import('../../services/screens/screenCoverage.js').ScreenCoverageSummary>
+}
+
+/** Pathname of a crawled page URL (the coverage match key input); the raw URL if unparseable. */
+function pageUrlToPathname(url: string): string {
+  try {
+    return new URL(url).pathname
+  } catch {
+    return url
+  }
 }
 
 function makeEmptyStructure(): SiteStructure {
@@ -401,6 +428,23 @@ export async function runRun(root: string, opts: RunOpts, deps: RunDeps): Promis
     collectedPages = result.rawPages.length > 0 ? result.rawPages : (deps.pages ?? [])
   } catch (error) {
     logger.error({ error, runId }, 'collect stage failed — continuing with empty structure')
+  }
+
+  // Stage 1.2: screen coverage (optional, best-effort). Match this run's visited pages against the
+  // static screen inventory (the denominator) and merge into the cumulative store. Independent of
+  // --explore; any failure here only warns and never fails the run.
+  if (deps.screenInventory && deps.saveScreenCoverage) {
+    try {
+      const visitedPaths = collectedPages.map((p) => pageUrlToPathname(p.url))
+      const summary = await deps.saveScreenCoverage(root, deps.screenInventory, visitedPaths, runId)
+      const pct = (summary.ratio * 100).toFixed(1)
+      logger.info(
+        { total: summary.total, covered: summary.covered, newlyCovered: summary.newlyCovered },
+        `screens ${summary.covered}/${summary.total} (${pct}%)`,
+      )
+    } catch (error) {
+      logger.warn({ error, runId }, 'screen coverage update failed — continuing')
+    }
   }
 
   // Stage 1.5: explore-state (optional). Produces input-exploration state (invalid/boundary writes)

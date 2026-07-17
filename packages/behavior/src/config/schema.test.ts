@@ -38,6 +38,40 @@ describe('ConfigSchema', () => {
   })
 })
 
+describe('TargetSchema apiOrigins', () => {
+  it('accepts apiOrigins urls and leaves them unset when omitted', () => {
+    const cfg = ConfigSchema.parse({ ...baseValid, targets: [{ ...baseValid.targets[0], apiOrigins: ['https://api.example.com'] }] })
+    expect(cfg.targets[0].apiOrigins).toEqual(['https://api.example.com'])
+    expect(ConfigSchema.parse(baseValid).targets[0].apiOrigins).toBeUndefined()
+  })
+  it('rejects a non-url apiOrigin', () => {
+    expect(() => ConfigSchema.parse({ ...baseValid, targets: [{ ...baseValid.targets[0], apiOrigins: ['not a url'] }] })).toThrow()
+  })
+})
+
+describe('ExploreSchema routes', () => {
+  it('accepts a routes source with include/exclude and applies defaults', () => {
+    const cfg = ConfigSchema.parse({ ...baseValid, explore: {
+      routes: { file: 'routes.json', include: ['/api/v2'], exclude: ['/api/v2/internal'] },
+    } })
+    expect(cfg.explore?.routes?.file).toBe('routes.json')
+    expect(cfg.explore?.routes?.include).toEqual(['/api/v2'])
+    expect(cfg.explore?.screens).toEqual([]) // sibling defaults still apply
+  })
+  it('accepts a command source and defaults include/exclude to empty', () => {
+    const cfg = ConfigSchema.parse({ ...baseValid, explore: { routes: { command: 'php artisan route:list --json' } } })
+    expect(cfg.explore?.routes?.command).toBe('php artisan route:list --json')
+    expect(cfg.explore?.routes?.include).toEqual([])
+    expect(cfg.explore?.routes?.exclude).toEqual([])
+  })
+  it('leaves routes unset when omitted', () => {
+    expect(ConfigSchema.parse({ ...baseValid, explore: { screens: ['/a'] } }).explore?.routes).toBeUndefined()
+  })
+  it('rejects an empty routes file string', () => {
+    expect(() => ConfigSchema.parse({ ...baseValid, explore: { routes: { file: '' } } })).toThrow()
+  })
+})
+
 describe('LaunchSchema', () => {
   it('accepts a valid launch config', () => {
     const cfg = ConfigSchema.parse({ ...baseValid, launch: {

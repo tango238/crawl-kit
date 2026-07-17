@@ -10,8 +10,23 @@ import type {
   DiscoveredForm, ColumnDef, FieldConstraint, InputCase, CaseOutcome, Baseline, GapVerdict, QualityFinding,
 } from '../services/explore/types.js'
 import type { ExploreExecDeps } from '../services/explore/execute.js'
+import type { ApiTransaction } from '../domain/transaction.js'
+import type { RouteInventory } from '../services/explore/routeInventory.js'
+import type { CoverageSummary } from '../services/explore/routeCoverage.js'
+import type { ExploreSession } from '../services/explore/session.js'
+import type { ScreenSpec, ScreenSpecInput } from '../services/screens/spec.js'
+import type { Baseline as ExploreBaseline } from '../services/explore/types.js'
 
-export type ExploreOpts = { target?: string; screens?: string[]; skipPrepare?: boolean; noReseed?: boolean }
+export type ExploreOpts = {
+  target?: string
+  screens?: string[]
+  /** Listing screens to expand one level (depth-1): their same-prefix links are added as explore targets. */
+  screenPrefixes?: string[]
+  skipPrepare?: boolean
+  noReseed?: boolean
+  /** Skip merging the previous session's screens into this run's explore targets. */
+  noReplay?: boolean
+}
 
 export type ExploreResult = {
   findings: VerifyFinding[]
@@ -20,6 +35,12 @@ export type ExploreResult = {
   gapsHigh: number
   gapsMedium: number
   messageIssues: number
+  /** Route coverage after this run (undefined when no inventory/coverage deps are wired). */
+  coverage?: CoverageSummary
+  /** How many screens were driven by a pre-computed ScreenSpec (no browser-time LLM). */
+  specDriven?: number
+  /** Display-check findings count (spec-declared fields missing from the rendered screen). */
+  displayIssues?: number
 }
 
 /** All external I/O is injected. `reportDeps` is everything writeReport needs except findings. */
@@ -36,6 +57,8 @@ export type ExploreDeps = {
   createPage: () => Promise<PageLike>
   authenticate: (page: PageLike, target: TargetEnv, creds: { username: string; password: string }) => Promise<LoginResult>
   discoverForms: (page: PageLike, target: TargetEnv, screens: string[]) => Promise<DiscoveredForm[]>
+  /** Depth-1 expansion of `opts.screenPrefixes` (optional — omitted/undefined ⇒ no expansion). */
+  expandScreenPrefixes?: (page: PageLike, target: TargetEnv, prefixes: string[]) => Promise<string[]>
   inferCandidateTables: (form: DiscoveredForm, llm: Llm) => Promise<string[]>
   introspectTable: (db: DbAdapter, dbType: 'postgres' | 'mysql', table: string) => Promise<ColumnDef[]>
   modelConstraints: (form: DiscoveredForm, columns: ColumnDef[], sourceRules: string, llm: Llm) => Promise<FieldConstraint[]>
@@ -50,6 +73,38 @@ export type ExploreDeps = {
   llm: Llm
   sourceRules?: string
   execDeps?: ExploreExecDeps
+
+  // ── ScreenSpec-driven exploration (optional — absent ⇒ every screen uses the live LLM path) ──
+  /** The pre-computed screen analysis bundle: spec-covered screens explore WITHOUT browser-time
+   *  LLM (form/constraints/baseline from the spec), get display checks, and run in FK-dependency
+   *  order. Screens without a spec fall back to the live discoverForms→LLM path unchanged. */
+  screenSpecs?: {
+    load: (root: string) => Promise<ScreenSpec[]>
+    match: (specs: ScreenSpec[], concretePath: string) => ScreenSpec | null
+    toForm: (spec: ScreenSpec, screenPath: string) => DiscoveredForm | null
+    toConstraints: (spec: ScreenSpec) => FieldConstraint[]
+    toBaseline: (spec: ScreenSpec) => ExploreBaseline
+    /** Resolve FK placeholder values against the live DB (absent ⇒ placeholders kept). */
+    resolveFk?: (inputs: ScreenSpecInput[]) => Promise<ScreenSpecInput[]>
+    order: (screens: string[], specs: ScreenSpec[]) => string[]
+    checkDisplays?: (page: PageLike, target: TargetEnv, spec: ScreenSpec, screenPath: string) => Promise<VerifyFinding[]>
+  }
+
+  // ── Route coverage + session save/replay (all optional — absent ⇒ feature off) ──
+  /** Expected-route inventory (the coverage denominator), pre-enumerated from the app's routing. */
+  loadRouteInventory?: (root: string) => Promise<RouteInventory | null>
+  /** This run's recorded same-origin transactions (from the attached recorder). Async so the
+   *  wiring can drain in-flight response handlers (recorder.settle) before snapshotting. */
+  getTransactions?: () => ApiTransaction[] | Promise<ApiTransaction[]>
+  /** Previous run's session — its screens are replayed as explore targets unless opts.noReplay. */
+  loadLatestSession?: (root: string) => Promise<ExploreSession | null>
+  /** Merge this run's matches into the cumulative coverage store (.e2e/explore/coverage.*). */
+  saveCoverage?: (root: string, inventory: RouteInventory, txs: ApiTransaction[], runId: string) => Promise<CoverageSummary>
+  /** Persist this run's per-screen req/res session log (.e2e/explore/sessions/). */
+  saveSession?: (
+    root: string,
+    args: { runId: string; startedAt: string; screens: string[]; txs: ApiTransaction[] },
+  ) => Promise<void>
 
   /** Persist findings to the shared store (the `report` command aggregates them) */
   writeFindings: (root: string, entry: FindingsEntry) => Promise<void>
@@ -100,6 +155,7 @@ export async function explore(root: string, opts: ExploreOpts, deps: ExploreDeps
 
   const secrets = deps.secrets ?? []
   const runId = deps.runId ?? new Date().toISOString().replace(/[:.]/g, '-')
+  const startedAt = new Date().toISOString()
 
   // Stage 0: prepare (repo refresh + setup hooks).
   if (!opts.skipPrepare && deps.prepare && deps.config) {
@@ -116,9 +172,46 @@ export async function explore(root: string, opts: ExploreOpts, deps: ExploreDeps
       throw new Error(`explore: authentication failed (${auth.detail}) — aborting before any form submission`)
     }
 
-    // Stage 2: discover forms.
-    const screens = opts.screens ?? []
-    const forms = await deps.discoverForms(page, deps.target, screens)
+    // Stage 2: discover forms. Explicit screens, plus (when both a non-empty screenPrefixes and the
+    // expandScreenPrefixes dep are given) their depth-1 link expansion, plus (unless --no-replay)
+    // the previous session's screens — deduped, explicit first.
+    const explicitScreens = opts.screens ?? []
+    const expandedScreens =
+      opts.screenPrefixes && opts.screenPrefixes.length > 0 && deps.expandScreenPrefixes
+        ? await deps.expandScreenPrefixes(page, deps.target, opts.screenPrefixes)
+        : []
+    const replayedScreens =
+      !opts.noReplay && deps.loadLatestSession ? ((await deps.loadLatestSession(root))?.screens ?? []) : []
+    if (replayedScreens.length > 0) {
+      logger.info({ count: replayedScreens.length }, 'explore: replaying screens from the previous session')
+    }
+    const resolvedScreens = Array.from(new Set([...explicitScreens, ...expandedScreens, ...replayedScreens]))
+
+    // Stage 2.1: apply the pre-computed ScreenSpecs. Spec-covered screens are driven statically
+    // (no browser-time LLM) and ordered so FK providers run before their dependents; the rest
+    // fall back to live form discovery. Best-effort: a spec-load failure degrades to live-only.
+    let specs: ScreenSpec[] = []
+    if (deps.screenSpecs) {
+      try {
+        specs = await deps.screenSpecs.load(root)
+      } catch (err) {
+        logger.warn({ err: String(err) }, 'explore: screen-spec load failed — falling back to live discovery')
+      }
+    }
+    const screens =
+      deps.screenSpecs && specs.length > 0 ? deps.screenSpecs.order(resolvedScreens, specs) : resolvedScreens
+
+    type FormEntry = { form: DiscoveredForm; spec?: ScreenSpec }
+    const specEntries: FormEntry[] = []
+    const liveScreens: string[] = []
+    for (const screen of screens) {
+      const spec = deps.screenSpecs && specs.length > 0 ? deps.screenSpecs.match(specs, screen) : null
+      const form = spec && deps.screenSpecs ? deps.screenSpecs.toForm(spec, screen) : null
+      if (spec && form) specEntries.push({ form, spec })
+      else liveScreens.push(screen)
+    }
+    const liveForms = await deps.discoverForms(page, deps.target, liveScreens)
+    const entries: FormEntry[] = [...specEntries, ...liveForms.map((form) => ({ form }))]
 
     const findings: VerifyFinding[] = []
     let cases = 0
@@ -126,20 +219,33 @@ export async function explore(root: string, opts: ExploreOpts, deps: ExploreDeps
     let gapsMedium = 0
     let messageIssues = 0
 
-    for (const form of forms) {
+    for (const { form, spec } of entries) {
       try {
-        // model
-        const tables = await deps.inferCandidateTables(form, deps.llm)
-        const columns: ColumnDef[] = []
-        if (deps.db) {
-          for (const t of tables) columns.push(...(await deps.introspectTable(deps.db, deps.dbType, t)))
+        let constraints: FieldConstraint[]
+        let baseline: ExploreBaseline
+        if (spec && deps.screenSpecs) {
+          // Spec path: constraints + valid baseline come from the static analysis; FK placeholder
+          // values resolve against the live DB when available. No LLM below this line.
+          const inputs = deps.screenSpecs.resolveFk
+            ? await deps.screenSpecs.resolveFk(spec.submits?.inputs ?? [])
+            : (spec.submits?.inputs ?? [])
+          const resolvedSpec: ScreenSpec = spec.submits ? { ...spec, submits: { ...spec.submits, inputs } } : spec
+          constraints = deps.screenSpecs.toConstraints(resolvedSpec)
+          baseline = deps.screenSpecs.toBaseline(resolvedSpec)
+        } else {
+          // Live path (unchanged): infer tables, introspect, model constraints via LLM.
+          const tables = await deps.inferCandidateTables(form, deps.llm)
+          const columns: ColumnDef[] = []
+          if (deps.db) {
+            for (const t of tables) columns.push(...(await deps.introspectTable(deps.db, deps.dbType, t)))
+          }
+          constraints = await deps.modelConstraints(form, columns, deps.sourceRules ?? '', deps.llm)
+          baseline = deps.buildBaseline(constraints)
         }
-        const constraints = await deps.modelConstraints(form, columns, deps.sourceRules ?? '', deps.llm)
         if (constraints.length === 0) continue
 
-        // generate
-        const baseline = deps.buildBaseline(constraints)
-        const inputCases = await deps.generateCases(constraints, deps.llm)
+        // generate — spec-driven forms use rule cases only (deterministic, no LLM add-on)
+        const inputCases = await deps.generateCases(constraints, spec ? undefined : deps.llm)
 
         // execute + classify gaps
         const rejectOutcomes: CaseOutcome[] = []
@@ -164,24 +270,71 @@ export async function explore(root: string, opts: ExploreOpts, deps: ExploreDeps
           }
         }
 
-        // message quality
-        const quality = await deps.classifyErrorQuality(form, rejectOutcomes, deps.llm)
-        for (const q of quality) {
-          findings.push(qualityFinding(q))
-          messageIssues++
+        // message quality — LLM judgment, so spec-driven forms skip it (the spec path's contract
+        // is zero browser-time LLM; run message-quality separately if wanted).
+        if (!spec) {
+          const quality = await deps.classifyErrorQuality(form, rejectOutcomes, deps.llm)
+          for (const q of quality) {
+            findings.push(qualityFinding(q))
+            messageIssues++
+          }
         }
       } catch (err) {
         logger.warn({ err: String(err), screen: form.screenPath }, 'explore: form failed — continuing')
       }
     }
 
+    // Stage 2.4: display checks — verify spec-declared (labeled) display fields actually render.
+    let displayIssues = 0
+    if (deps.screenSpecs?.checkDisplays && specs.length > 0) {
+      for (const screen of screens) {
+        const spec = deps.screenSpecs.match(specs, screen)
+        if (!spec || spec.displays.length === 0) continue
+        try {
+          const displayFindings = await deps.screenSpecs.checkDisplays(page, deps.target, spec, screen)
+          findings.push(...displayFindings)
+          displayIssues += displayFindings.length
+        } catch (err) {
+          logger.warn({ err: String(err), screen }, 'explore: display check failed — continuing')
+        }
+      }
+    }
+
+    // Stage 2.5: route coverage + session log. Coverage marks inventory routes hit by this run's
+    // recorded traffic (cumulative across runs); the session log saves per-screen req/res data and
+    // doubles as the next run's replay source. Both are best-effort — never fail the run.
+    let coverage: CoverageSummary | undefined
+    const txs = (await deps.getTransactions?.()) ?? []
+    if (deps.loadRouteInventory && deps.saveCoverage) {
+      try {
+        const inventory = await deps.loadRouteInventory(root)
+        if (inventory) {
+          coverage = await deps.saveCoverage(root, inventory, txs, runId)
+          logger.info(
+            { total: coverage.total, covered: coverage.covered, newlyCovered: coverage.newlyCovered },
+            'explore: route coverage updated',
+          )
+        } else {
+          logger.warn({ root }, 'explore: no route inventory found — coverage skipped (configure explore.routes or run structure analysis)')
+        }
+      } catch (err) {
+        logger.warn({ err: String(err) }, 'explore: coverage tracking failed — continuing')
+      }
+    }
+    if (deps.saveSession && txs.length > 0) {
+      try {
+        await deps.saveSession(root, { runId, startedAt, screens, txs })
+      } catch (err) {
+        logger.warn({ err: String(err) }, 'explore: session save failed — continuing')
+      }
+    }
+
     // Stage 3: persist findings to the shared store (reporting is the separate `report` step).
-    const startedAt = new Date().toISOString()
     await deps.writeFindings(root, { source: 'explore', runId, startedAt, diffFindings: [], verifyFindings: findings })
     if (deps.appendActivity) {
       await deps.appendActivity(root, {
         source: 'explore', runId, startedAt,
-        summary: `forms ${forms.length}, cases ${cases}, gaps ${gapsHigh + gapsMedium} (high ${gapsHigh}/medium ${gapsMedium}), message-issues ${messageIssues}`,
+        summary: `forms ${entries.length} (spec-driven ${specEntries.length}), cases ${cases}, gaps ${gapsHigh + gapsMedium} (high ${gapsHigh}/medium ${gapsMedium}), message-issues ${messageIssues}, display-issues ${displayIssues}`,
       })
     }
 
@@ -190,7 +343,17 @@ export async function explore(root: string, opts: ExploreOpts, deps: ExploreDeps
       await deps.seedDatabase(deps.seed, root, secrets)
     }
 
-    return { findings, forms: forms.length, cases, gapsHigh, gapsMedium, messageIssues }
+    return {
+      findings,
+      forms: entries.length,
+      cases,
+      gapsHigh,
+      gapsMedium,
+      messageIssues,
+      coverage,
+      specDriven: specEntries.length,
+      displayIssues,
+    }
   } finally {
     await page.close?.().catch(() => {})
   }

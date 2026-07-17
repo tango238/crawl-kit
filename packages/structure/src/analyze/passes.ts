@@ -52,6 +52,11 @@ export interface RunPassesResult {
 }
 
 /** Run the analysis passes over a repo: enumerate → (per pass) fan-out+diff → merge → emit. */
+/** Nothing extracted at all — either a legitimately bare unit or a swallowed parse failure. */
+function isEmptyFragment(f: StructureFragment): boolean {
+  return f.routes.length === 0 && f.controllers.length === 0 && f.models.length === 0 && f.refs.length === 0;
+}
+
 export async function runPasses(
   repoPath: string,
   opts: RunPassesOpts,
@@ -64,6 +69,13 @@ export async function runPasses(
   const passes = opts.passes ?? [1, 2, 3];
 
   const results: PassResult[] = [];
+  // Fragments accumulate ACROSS passes: pass 1 yields the route inventory, later passes yield
+  // detail/cross-unit fragments. Each pass's merged view must fold every fragment so far —
+  // merging only the current pass's fragments drops pass-1 routes from pass ≥2, and the FINAL
+  // pass's merged is what incremental.ts projects into the returned extract (observed in the
+  // field: structure.nodes.json collapsed from 534 nodes to 6). mergeFragments dedupes routes
+  // by normalizeRoute key and unions the rest, so cross-pass accumulation is idempotent-safe.
+  const allFrags: StructureFragment[] = [];
   for (const pass of passes) {
     let done = 0; // completion counter for this pass — incremented in the completion callback so it stays monotonic under concurrent fan-out
     const frags = await Promise.all(
@@ -77,13 +89,24 @@ export async function runPasses(
             }
           }
           const frag = await parse(u, pass, { llm: deps.llm, repoPath, context: opts.context });
+          // Cache-poisoning guard: parseUnit swallows LLM failures into an EMPTY fragment, which
+          // is indistinguishable from "unit legitimately has nothing". Caching such an empty makes
+          // the failure PERMANENT (the hash never changes, so reruns serve the poisoned cache —
+          // observed: a routes file that one run extracted 124 routes from was cached as 0 by the
+          // next). Empties are still merged this run, but never cached, so a rerun re-parses and
+          // can heal. Truly-empty units pay one re-parse per run — the safe direction.
+          if (isEmptyFragment(frag)) {
+            await deps.onUnit?.(pass, u.id, ++done, units.length);
+            return frag;
+          }
           writeFragment(cacheDir, frag);
           await deps.onUnit?.(pass, u.id, ++done, units.length);
           return frag;
         }),
       ),
     );
-    const merged = mergeFragments(frags);
+    allFrags.push(...frags);
+    const merged = mergeFragments(allFrags);
     await deps.onPass?.(pass, merged, units);
     results.push({ pass, merged });
   }

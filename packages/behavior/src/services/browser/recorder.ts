@@ -11,6 +11,10 @@ export type RecorderOptions = {
   runId: string
   root: string
   baseUrl: string
+  /** Additional origins to record beyond baseUrl's — for SPAs whose API lives on another origin
+   *  (e.g. app on admin.example.com calling api.example.com). Page context (pageUrl) stays
+   *  baseUrl-scoped: screens belong to the app, only the traffic fans out. */
+  extraOrigins?: string[]
   secrets: string[]
   bodyCapBytes?: number
 }
@@ -30,7 +34,17 @@ export type RecRequest = {
 export type RecorderPage = {
   on(event: 'requestfinished' | 'requestfailed', cb: (req: RecRequest) => void): void
 }
-export type Recorder = { attach(page: RecorderPage, stage: RecordStage): void; path: string }
+export type Recorder = {
+  attach(page: RecorderPage, stage: RecordStage): void
+  path: string
+  /** Every tx recorded this process, in record order — a copy, so callers can't mutate the
+   *  collector. Populated in-memory as each tx is built (before the async file append), so it
+   *  never depends on fs success. Downstream: route-coverage + session log for the explore run. */
+  transactions(): ApiTransaction[]
+  /** Wait for in-flight record() handlers (which await response bodies) to finish, so a
+   *  transactions() snapshot taken right after includes late-settling traffic. */
+  settle(): Promise<void>
+}
 
 const API_TYPES = new Set(['xhr', 'fetch', 'document'])
 export function isApiResourceType(t: string): boolean {
@@ -43,6 +57,12 @@ export function sameOrigin(url: string, baseUrl: string): boolean {
   } catch {
     return false
   }
+}
+
+/** Is the url's origin one of the recorded origins (baseUrl's own, or an extra API origin)? */
+export function matchesRecordedOrigin(url: string, baseUrl: string, extraOrigins?: string[]): boolean {
+  if (sameOrigin(url, baseUrl)) return true
+  return (extraOrigins ?? []).some((o) => sameOrigin(url, o))
 }
 
 export function capBody(s: string, cap: number): { body: string; truncated: boolean } {
@@ -74,6 +94,7 @@ export function createRecorder(opts: RecorderOptions): Recorder {
   const path = join(statePaths(opts.root).runs, `${opts.runId}${TRANSACTIONS_SUFFIX}`)
   let seq = 0
   let ensured = false
+  const collected: ApiTransaction[] = []
 
   const mask = (s: string): string => maskSecrets(s, opts.secrets)
 
@@ -92,7 +113,7 @@ export function createRecorder(opts: RecorderOptions): Recorder {
   async function record(req: RecRequest, stage: RecordStage, failed: boolean): Promise<void> {
     try {
       const url = req.url()
-      if (!sameOrigin(url, opts.baseUrl)) return
+      if (!matchesRecordedOrigin(url, opts.baseUrl, opts.extraOrigins)) return
       if (!isApiResourceType(req.resourceType())) return
 
       const rawReqBody = req.postData() ?? undefined
@@ -146,17 +167,31 @@ export function createRecorder(opts: RecorderOptions): Recorder {
         errorText: errText || undefined,
         pageUrl,
       }
+      // Collect in-memory before the fs append so the getter never depends on write success.
+      collected.push(tx)
       await write(tx)
     } catch (err) {
       logger.warn({ err: String(err) }, 'recorder: record failed — continuing')
     }
   }
 
+  // In-flight record() promises: each awaits the response body before pushing to `collected`,
+  // so a synchronous transactions() snapshot could miss late traffic. settle() drains them.
+  const pending = new Set<Promise<void>>()
+  const track = (p: Promise<void>): void => {
+    pending.add(p)
+    void p.finally(() => pending.delete(p))
+  }
+
   return {
     path,
     attach(page: RecorderPage, stage: RecordStage): void {
-      page.on('requestfinished', (req) => void record(req, stage, false))
-      page.on('requestfailed', (req) => void record(req, stage, true))
+      page.on('requestfinished', (req) => track(record(req, stage, false)))
+      page.on('requestfailed', (req) => track(record(req, stage, true)))
+    },
+    transactions: () => collected.slice(),
+    settle: async () => {
+      await Promise.allSettled([...pending])
     },
   }
 }

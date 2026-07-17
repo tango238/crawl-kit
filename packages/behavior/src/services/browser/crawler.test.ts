@@ -190,6 +190,40 @@ describe('crawler (unit, fake browser)', () => {
 
     expect(pages.length).toBe(2)
   })
+
+  it('crawls a seeded path that nothing links to (screen-inventory seed)', async () => {
+    const { crawlWithBrowser } = await import('./crawler.js')
+
+    let currentUrl = 'https://example.com/'
+    // The root links to /a only; /deep/screen is orphaned and reachable only via the seed.
+    const rootHtml = '<html><body><a href="/a">A</a></body></html>'
+    const page = makeFakePage({
+      goto: vi.fn().mockImplementation(async (url: string) => { currentUrl = url }),
+      url: vi.fn().mockImplementation(() => currentUrl),
+      content: vi.fn().mockImplementation(async () =>
+        currentUrl.endsWith('/') ? rootHtml : '<html><body>leaf</body></html>'),
+      title: vi.fn().mockResolvedValue('P'),
+    })
+    const browser = makeFakeBrowser(page)
+    const target: TargetEnv = { name: 't', baseUrl: 'https://example.com', auth: { strategy: 'none' } }
+
+    const pages = await crawlWithBrowser(
+      browser as unknown as Parameters<typeof crawlWithBrowser>[0],
+      target,
+      [],
+      '/tmp',
+      {
+        discover: { maxPages: 10, maxDepth: 2, excludePaths: [] },
+        // Templated seeds (containing ':') are dropped — only /deep/screen is navigable.
+        seedPaths: ['/deep/screen', '/hotel/:id'],
+      },
+    )
+
+    const urls = pages.map((p) => p.url)
+    expect(urls).toContain('https://example.com/deep/screen')
+    expect(urls).toContain('https://example.com/a')
+    expect(urls).not.toContain('https://example.com/hotel/:id')
+  })
 })
 
 describe('crawler — authenticate hook (scenario-aware login)', () => {

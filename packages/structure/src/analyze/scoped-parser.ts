@@ -6,7 +6,10 @@
 // reply yields an empty fragment rather than aborting, so one unhealthy unit never sinks
 // the run. Pass 1 asks only for a route inventory (cheap); pass 2 asks for detail.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { emptyFragment, type FragmentRef, type StructureFragment } from "./fragments.js";
+import { parseLaravelRoutes } from "./laravel-routes.js";
 import type { LlmProvider } from "./llm/provider.js";
 import type { ParsedController, ParsedModel, ParsedRoute } from "./source-parser.js";
 import type { Unit } from "./units.js";
@@ -25,6 +28,21 @@ export interface ParseUnitDeps {
 /** Parse a single unit at the given pass into a fragment. Never throws on LLM output. */
 export async function parseUnit(unit: Unit, pass: number, deps: ParseUnitDeps): Promise<StructureFragment> {
   const base = emptyFragment(unit.id, unit.hash, pass);
+
+  // Deterministic PRIMARY path: pass-1 route inventory on a laravel routes unit is
+  // mechanically parseable, so we skip the (slow, non-deterministic) LLM entirely. A zero
+  // result falls through to the LLM (belt and braces) so a parser gap never loses a unit.
+  if (pass === 1 && unit.framework === "laravel" && unit.kind === "routes") {
+    const routes = parseLaravelRoutesFromUnit(unit, deps.repoPath);
+    if (routes.length > 0) {
+      console.error(`  [info] laravel routes parsed deterministically: ${unit.id} (${routes.length} routes)`);
+      return { ...base, routes };
+    }
+    if (deps.llm) {
+      console.error(`  [warn] deterministic parse found 0 routes for ${unit.id}; falling back to LLM`);
+    }
+  }
+
   if (!deps.llm) return base;
 
   const prompt = buildPrompt(unit, pass, deps.context);
@@ -53,6 +71,29 @@ export async function parseUnit(unit: Unit, pass: number, deps: ParseUnitDeps): 
 /** Shorter budget for the cheap inventory pass; more for detail/cross-unit passes. */
 function passTimeout(pass: number): number {
   return pass === 1 ? 120 : 300;
+}
+
+/**
+ * Read a routes unit's PHP file(s) from disk and parse them deterministically. Reads mirror
+ * the LLM path's file access (repo-relative POSIX paths joined onto repoPath); an unreadable
+ * file is skipped, never fatal.
+ *
+ * Limitation: the file's mount prefix (e.g. "api/v1") lives in the app's RouteServiceProvider,
+ * which is NOT part of a routes unit, so no prefix is available statically here. We therefore
+ * leave paths exactly as written in the file rather than inventing a prefix.
+ */
+function parseLaravelRoutesFromUnit(unit: Unit, repoPath: string): ParsedRoute[] {
+  const routes: ParsedRoute[] = [];
+  for (const rel of unit.files) {
+    let content: string;
+    try {
+      content = readFileSync(join(repoPath, rel), "utf8");
+    } catch {
+      continue;
+    }
+    routes.push(...parseLaravelRoutes(content));
+  }
+  return routes;
 }
 
 // ── prompts ────────────────────────────────────────────────────────────────

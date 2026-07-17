@@ -71,6 +71,22 @@ describe('createRecorder', () => {
     expect(rows[0].requestBody).toContain('***')
   })
 
+  it('collects each recorded tx in memory, returning a copy from transactions()', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rec-'))
+    const rec = createRecorder({ runId: 'mem', root, baseUrl: 'http://app.test', secrets: [] })
+    const page = fakePage()
+    rec.attach(page as any, 'explore')
+    page.emitFinished(req({ url: () => 'http://app.test/api/orders', method: () => 'POST' }))
+    page.emitFinished(req({ url: () => 'http://app.test/api/orders/1', method: () => 'GET', postData: () => null }))
+    await new Promise((r) => setTimeout(r, 10))
+    const txs = rec.transactions()
+    expect(txs).toHaveLength(2)
+    expect(txs.map((t) => t.path)).toEqual(['/api/orders', '/api/orders/1'])
+    // returned array is a copy — mutating it does not affect the collector
+    txs.pop()
+    expect(rec.transactions()).toHaveLength(2)
+  })
+
   it('skips static assets and cross-origin requests', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rec-'))
     const rec = createRecorder({ runId: 'r', root, baseUrl: 'http://app.test', secrets: [] })
@@ -80,6 +96,47 @@ describe('createRecorder', () => {
     page.emitFinished(req({ url: () => 'http://cdn.other/x.js', resourceType: () => 'fetch' }))
     await new Promise((r) => setTimeout(r, 10))
     expect(await lines(rec.path)).toHaveLength(0)
+  })
+
+  it('settle() drains in-flight response handlers so the snapshot includes late traffic', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rec-'))
+    const rec = createRecorder({ runId: 'late', root, baseUrl: 'http://app.test', secrets: [] })
+    const page = fakePage()
+    rec.attach(page as any, 'explore')
+    let release!: () => void
+    const gate = new Promise<void>((r) => { release = r })
+    page.emitFinished(req({
+      response: async () => {
+        await gate // response body still streaming
+        return { status: () => 200, statusText: () => 'OK', text: async () => '{}' }
+      },
+    }))
+    expect(rec.transactions()).toHaveLength(0) // naive sync snapshot misses the in-flight tx
+    release()
+    await rec.settle()
+    expect(rec.transactions()).toHaveLength(1)
+  })
+
+  it('records requests to configured extraOrigins (SPA calling an API on another origin)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rec-'))
+    const rec = createRecorder({
+      runId: 'r', root, baseUrl: 'https://admin.app.test', extraOrigins: ['https://api.app.test'], secrets: [],
+    })
+    const page = fakePage()
+    rec.attach(page as any, 'explore')
+    page.emitFinished(req({
+      url: () => 'https://api.app.test/api/v2/plans',
+      method: () => 'GET',
+      postData: () => null,
+      frame: () => ({ url: () => 'https://admin.app.test/plans' }),
+    }))
+    page.emitFinished(req({ url: () => 'https://unrelated.test/x', resourceType: () => 'fetch' }))
+    await new Promise((r) => setTimeout(r, 10))
+    const rows = await lines(rec.path)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].path).toBe('/api/v2/plans')
+    // pageUrl stays baseUrl-scoped: the owning screen is the SPA page
+    expect(rows[0].pageUrl).toBe('https://admin.app.test/plans')
   })
 
   it('records a failed request with failed=true', async () => {

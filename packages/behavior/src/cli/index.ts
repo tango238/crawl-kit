@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander'
+import { installUnhandledRejectionGuard } from '../util/unhandledGuard.js'
 import { createRecorder, withRecorder } from '../services/browser/recorder.js'
 import type { RecorderPage } from '../services/browser/recorder.js'
 import { createGithubClient } from '../services/github/client.js'
@@ -136,9 +137,11 @@ program
   .option('--skip-scenarios', 'Skip executing adopted scenarios (only collect/diff/verify)')
   .option('--explore', 'Run the exploratory input-verification stage before verify (destructive; re-seeds after)')
   .option('--screen <path...>', 'Screen path(s) for --explore (falls back to config.explore.screens)')
+  .option('--screen-prefix <path...>', 'Listing screen(s) for --explore to expand one level (falls back to config.explore.screenPrefixes)')
   .option('--no-reseed', 'With --explore: do not re-seed the DB afterward (skips the dev-guard)')
+  .option('--no-replay', 'With --explore: do not replay the previous session\'s screens as explore targets')
   .option('--no-report', 'Write findings to the store only; aggregate later with `loop-e2e report`')
-  .action(async (opts: { target?: string; skipPrepare?: boolean; skipScenarios?: boolean; explore?: boolean; screen?: string[]; reseed?: boolean; report?: boolean }) => {
+  .action(async (opts: { target?: string; skipPrepare?: boolean; skipScenarios?: boolean; explore?: boolean; screen?: string[]; screenPrefix?: string[]; reseed?: boolean; replay?: boolean; report?: boolean }) => {
     const cwd = process.cwd()
 
     let config: import('../config/schema.js').Config
@@ -205,6 +208,34 @@ program
       ...Object.values(secrets.targetAuth),
     ].filter(Boolean) as string[]
 
+    // Static screen inventory (Next.js router scan of the frontend repo): the coverage denominator
+    // AND the crawl seed list. Best-effort — a missing/unrecognized frontend just means no screen
+    // coverage this run. Concrete screens seed the crawl so every declared screen is reached; the
+    // seed list is bounded by crawl.maxPages (with a warning) so it never blows the page budget.
+    const { resolveFrontendDir, collectScreenInventory } = await import('../services/screens/inventory.js')
+    let screenInventory: import('../services/screens/inventory.js').ScreenInventory | null = null
+    let seedPaths: string[] = []
+    try {
+      const frontendDir = resolveFrontendDir(cwd, config.repositories)
+      if (frontendDir) {
+        screenInventory = await collectScreenInventory(frontendDir)
+        if (screenInventory) {
+          const maxPages = (config.crawl ?? DEFAULT_CRAWL).maxPages
+          const concrete = screenInventory.screens.map((s) => s.path).filter((p) => !p.includes(':'))
+          if (screenInventory.screens.length > maxPages) {
+            logger.warn(
+              { screens: screenInventory.screens.length, maxPages },
+              'screen inventory exceeds crawl.maxPages — coverage denominator is larger than the page budget; seeding only up to maxPages',
+            )
+          }
+          seedPaths = concrete.slice(0, maxPages)
+          logger.info({ screens: screenInventory.screens.length, seeds: seedPaths.length, source: screenInventory.source }, 'screen inventory collected')
+        }
+      }
+    } catch (err) {
+      logger.warn({ err: String(err) }, 'screen inventory collection failed — continuing without screen coverage/seeds')
+    }
+
     let browserCtx: { browser: import('../services/browser/crawler.js').BrowserLike } | null = null
     // Shared authenticated context for the collection stages (declared here so `finally` can close it).
     let sharedAuthedContext: import('../services/browser/crawler.js').BrowserLike | null = null
@@ -217,11 +248,15 @@ program
       // explained precisely (e.g. "HTTP 422: 登録情報と一致しませんでした") rather than guessed —
       // the app shows such errors as auto-dismissing toasts the DOM scan misses.
       let lastAuthResponse: { status: number; bodyText?: string } | null = null
-      // Record every same-origin API req/res of this run to jsonl (masked+capped).
+      // Record every same-origin (+ configured apiOrigins) API req/res of this run to jsonl (masked+capped).
+      // The same runId flows into the explore pipeline so its session/coverage artifacts stay
+      // joinable to this recorder's <runId>.transactions.jsonl.
+      const recorderRunId = `run-${new Date().toISOString().replace(/[:.]/g, '-')}`
       const recorder = createRecorder({
-        runId: `run-${new Date().toISOString().replace(/[:.]/g, '-')}`,
+        runId: recorderRunId,
         root: cwd,
         baseUrl: selectedTarget.baseUrl,
+        extraOrigins: selectedTarget.apiOrigins,
         secrets: allSecrets,
       })
       const createPage = async () => {
@@ -245,6 +280,7 @@ program
       // --- run --explore wiring: explore-state stage + post-explore re-crawl + final reseed ---
       // Built lazily; the heavy explore impls are imported only when --explore is set.
       const exploreScreens = (opts.screen && opts.screen.length > 0) ? opts.screen : (config.explore?.screens ?? [])
+      const exploreScreenPrefixes = (opts.screenPrefix && opts.screenPrefix.length > 0) ? opts.screenPrefix : (config.explore?.screenPrefixes ?? [])
       const selAuth = selectedTarget.auth
       const exploreTarget: import('../domain/types.js').TargetEnv | null =
         selAuth && selAuth.strategy !== 'none'
@@ -322,52 +358,27 @@ program
             }
             const creds = exploreCreds
             const { explore } = await import('../pipeline/explore.js')
-            const { discoverForms } = await import('../services/explore/discover.js')
-            const { inferCandidateTables, modelConstraints } = await import('../services/explore/constraintModel.js')
-            const { introspectTable } = await import('../services/explore/dbIntrospect.js')
-            const { generateCases, buildBaseline } = await import('../services/explore/caseGen.js')
-            const { runCase } = await import('../services/explore/execute.js')
-            const { classifyGap, classifyErrorQuality } = await import('../services/explore/oracle.js')
-            const { wasValueSaved } = await import('../services/explore/dbProbe.js')
-            const { createDbAdapter } = await import('../services/db/index.js')
-            const { seedDatabase } = await import('../services/seed/seed.js')
-            const dbConf = config.databases[0]
-            const dbType: 'postgres' | 'mysql' = (dbConf?.type as 'postgres' | 'mysql') ?? 'postgres'
-            const db = dbConf ? createDbAdapter(dbConf, secrets.db[dbConf.passwordEnv] ?? '') : undefined
-            let lastStatus: number | undefined
-            // Pages come from the SHARED authenticated context, so explore does NOT log in again —
-            // its `authenticate` dep is a no-op verifying the already-established session.
-            const exCreatePage = async () => {
-              const page = await (await getAuthedContext()).newPage()
-              const r = page as unknown as { on?: (e: 'response', cb: (res: { status: () => number; request: () => { method: () => string } }) => void) => void }
-              r.on?.('response', (res) => {
-                try {
-                  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(res.request().method().toUpperCase())) lastStatus = res.status()
-                } catch { /* ignore */ }
-              })
-              recorder.attach(page as unknown as RecorderPage, 'explore')
-              return page
-            }
+            const { buildExploreDeps } = await import('./commands/explore-deps.js')
             // explore runs with prepare/reseed deferred to run: run already prepared, and run owns
             // the final reseed (Stage 5), so noReseed:true here.
-            return explore(root, { target: selectedTarget.name, screens: exploreScreens, skipPrepare: true, noReseed: true }, {
-              target: exploreTarget,
-              creds,
-              dbType,
-              seed: config.launch?.seed,
+            const deps = await buildExploreDeps({
+              exploreTarget,
+              exploreCreds: creds,
               config,
-              secrets: allSecrets,
-              execDeps: { secrets: allSecrets, getLastStatus: () => lastStatus },
-              createPage: exCreatePage,
-              // Session already established by the shared context; just confirm it.
-              authenticate: async () => ({ ok: true, detail: 'reusing shared authenticated session', finalUrl: exploreTarget.baseUrl }),
-              discoverForms: (page, t, screens) => discoverForms(page, t, screens),
-              inferCandidateTables, introspectTable, modelConstraints, generateCases, buildBaseline,
-              runCase, classifyGap, classifyErrorQuality, wasValueSaved, db, llm,
-              writeFindings, appendActivity,
-              // Required by ExploreDeps; unused here because noReseed:true (run owns the reseed).
-              seedDatabase: (seed, root, s) => seedDatabase(seed, root, defaultComposeRunner, s),
+              secrets,
+              allSecrets,
+              llm,
+              writeFindings,
+              appendActivity,
+              getAuthedContext,
+              attachRecorder: (page) => recorder.attach(page as unknown as RecorderPage, 'explore'),
+              getTransactions: async () => {
+                await recorder.settle() // drain in-flight response handlers so late traffic is included
+                return recorder.transactions()
+              },
+              runId: recorderRunId,
             })
+            return explore(root, { target: selectedTarget.name, screens: exploreScreens, screenPrefixes: exploreScreenPrefixes, skipPrepare: true, noReseed: true, noReplay: opts.replay === false }, deps)
           }
         : undefined
 
@@ -393,6 +404,7 @@ program
         skipScenarios: opts.skipScenarios,
         explore: opts.explore,
         screens: exploreScreens,
+        screenPrefixes: exploreScreenPrefixes,
         noReseed: opts.reseed === false,
       }, {
         ctx: runContext,
@@ -403,8 +415,8 @@ program
           // (skipLogin) so the whole collection phase logs in exactly once. BFS discovery is enabled
           // in both paths so the crawl reaches beyond base+scenario (was pageCount=2).
           crawl: opts.explore
-            ? (b, t, s, dir, onEdge) => crawl(b, t, s, dir, { skipLogin: true, discover: config.crawl ?? DEFAULT_CRAWL, onEdge })
-            : (b, t, s, dir, onEdge) => crawl(b, t, s, dir, { discover: config.crawl ?? DEFAULT_CRAWL, onEdge }),
+            ? (b, t, s, dir, onEdge) => crawl(b, t, s, dir, { skipLogin: true, discover: config.crawl ?? DEFAULT_CRAWL, onEdge, seedPaths })
+            : (b, t, s, dir, onEdge) => crawl(b, t, s, dir, { discover: config.crawl ?? DEFAULT_CRAWL, onEdge, seedPaths }),
           extractPageInfo: (lm, raw) => extractPageInfo(lm as Parameters<typeof extractPageInfo>[0], raw),
           // Wrap so the crawler's internal browser.newPage() calls are recorded (the crawl does
           // not go through createPage, so this is the single point that covers all crawl pages).
@@ -441,6 +453,14 @@ program
         exploreState,
         recrawl,
         reseed,
+        screenInventory,
+        saveScreenCoverage: async (root, inventory, visitedPaths, coverageRunId) => {
+          const { loadScreenCoverageStore, updateScreenCoverage, saveScreenCoverageStore } = await import('../services/screens/screenCoverage.js')
+          const prev = await loadScreenCoverageStore(root)
+          const { store, summary } = updateScreenCoverage(prev, inventory, visitedPaths, coverageRunId, new Date().toISOString())
+          await saveScreenCoverageStore(root, store)
+          return summary
+        },
       })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -632,14 +652,55 @@ program
   })
 
 program
+  .command('screen-analyze')
+  .description('Statically analyze frontend screens into ScreenSpecs (data/screen-specs/): endpoints, input constraints + generated values, display fields — the explore stage then drives spec-covered screens without browser-time LLM')
+  .option('--frontend-dir <path>', 'Frontend repo directory (defaults to the first role=frontend repository)')
+  .action(async (opts: { frontendDir?: string }) => {
+    const cwd = process.cwd()
+    try {
+      const { config } = await loadConfig(cwd)
+      const { collectScreenInventory, resolveFrontendDir } = await import('../services/screens/inventory.js')
+      const { analyzeScreens } = await import('../services/screens/analyze.js')
+      const { saveScreenSpecs } = await import('../services/screens/spec.js')
+
+      const frontendDir = opts.frontendDir ?? resolveFrontendDir(cwd, config.repositories)
+      if (!frontendDir) {
+        process.stderr.write('screen-analyze: no frontend directory found (configure a role=frontend repository or pass --frontend-dir)\n')
+        process.exit(1)
+      }
+      const inventory = await collectScreenInventory(frontendDir)
+      if (!inventory || inventory.screens.length === 0) {
+        process.stderr.write(`screen-analyze: no screens found under ${frontendDir} (expected a Next.js app/ or pages/ router)\n`)
+        process.exit(1)
+      }
+      const runId = `analyze-${new Date().toISOString().replace(/[:.]/g, '-')}`
+      const specs = await analyzeScreens(frontendDir, inventory.screens, { runId, now: new Date().toISOString() })
+      await saveScreenSpecs(cwd, specs)
+      const withSubmit = specs.filter((s) => s.submits).length
+      const withEndpoints = specs.filter((s) => s.uses.length > 0).length
+      process.stdout.write(
+        `screen-analyze: ${specs.length} screens (${inventory.source}) → data/screen-specs/ ` +
+          `[endpoints mapped: ${withEndpoints}, with submit form: ${withSubmit}]\n`,
+      )
+    } catch (err) {
+      process.stderr.write(`screen-analyze failed: ${err instanceof Error ? err.message : String(err)}\n`)
+      process.exit(1)
+    }
+  })
+
+program
   .command('explore')
   .description('Exploratory input-validation testing: drive forms with invalid/boundary values, detect validation gaps + poor error messages')
   .option('--target <name>', 'Target name to run against')
   .option('--screen <path...>', 'Screen path(s) to explore (repeatable)')
+  .option('--screen-prefix <path...>', 'Listing screen(s) to expand one level (same-prefix links become explore targets)')
   .option('--skip-prepare', 'Skip the pre-run prepare phase (repo refresh + setup hooks)')
   .option('--no-reseed', 'Do not re-seed the database after the run (skips the dev-guard)')
+  .option('--no-replay', 'Do not replay the previous session\'s screens as explore targets')
+  .option('--routes-file <path>', 'Expected-routes file for coverage (OpenAPI / Laravel route:list JSON / "METHOD /path" lines; overrides config.explore.routes)')
+  .option('--routes-command <cmd>', 'Command whose stdout is the expected-routes list (overrides config.explore.routes)')
   .option('--no-report', 'Write findings to the store only; aggregate later with `loop-e2e report`')
-  .action(async (opts: { target?: string; screen?: string[]; skipPrepare?: boolean; reseed?: boolean; report?: boolean }) => {
+  .action(async (opts: { target?: string; screen?: string[]; screenPrefix?: string[]; skipPrepare?: boolean; reseed?: boolean; replay?: boolean; routesFile?: string; routesCommand?: string; report?: boolean }) => {
     const cwd = process.cwd()
     const { runExplore } = await import('./commands/explore.js')
     const { explore } = await import('../pipeline/explore.js')
@@ -647,7 +708,16 @@ program
     try {
       const result = await runExplore(
         cwd,
-        { target: opts.target, screens: opts.screen ?? [], skipPrepare: opts.skipPrepare, noReseed: opts.reseed === false },
+        {
+          target: opts.target,
+          screens: opts.screen ?? [],
+          screenPrefixes: opts.screenPrefix ?? [],
+          skipPrepare: opts.skipPrepare,
+          noReseed: opts.reseed === false,
+          noReplay: opts.replay === false,
+          routesFile: opts.routesFile,
+          routesCommand: opts.routesCommand,
+        },
         {
           loadConfig,
           explore,
@@ -661,10 +731,17 @@ program
         },
       )
       process.stdout.write(
-        `explore: forms ${result.forms} / cases ${result.cases} / ` +
+        `explore: forms ${result.forms} (spec-driven ${result.specDriven ?? 0}) / cases ${result.cases} / ` +
           `gaps ${result.gapsHigh + result.gapsMedium} (high ${result.gapsHigh}/medium ${result.gapsMedium}) / ` +
-          `message-issues ${result.messageIssues}\n`,
+          `message-issues ${result.messageIssues} / display-issues ${result.displayIssues ?? 0}\n`,
       )
+      if (result.coverage) {
+        const pct = (result.coverage.ratio * 100).toFixed(1)
+        process.stdout.write(
+          `explore: route coverage ${result.coverage.covered}/${result.coverage.total} (${pct}%) — ` +
+            `+${result.coverage.newlyCovered} new → ${STATE_DIR}/explore/coverage.md\n`,
+        )
+      }
       // Aggregate into a report unless --no-report (then run `loop-e2e report` later).
       if (opts.report === false) {
         process.stdout.write('explore: findings written to the store. Aggregate later with `loop-e2e report`.\n')
@@ -740,5 +817,9 @@ program
       process.exit(1)
     }
   })
+
+// One flaky background rejection (e.g. a claude CLI child exiting 1) must not kill a
+// 90-minute crawl — stages report their own failures; see util/unhandledGuard.ts.
+installUnhandledRejectionGuard()
 
 program.parse()

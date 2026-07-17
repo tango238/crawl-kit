@@ -2,6 +2,7 @@ import { ensureDir } from '../../util/fs.js'
 import { logger } from '../../util/logger.js'
 import { screenshot } from './snapshot.js'
 import { discoverPages, normalizeUrl } from './discover.js'
+import { waitForClientRender, settleNetwork } from './render.js'
 import type { NavEdge } from './discover.js'
 import type { RawPage, TargetEnv } from '../../domain/types.js'
 import type { Crawl } from '../../config/schema.js'
@@ -95,7 +96,11 @@ function resolveUrl(stepTarget: string, baseUrl: string): string {
  */
 async function capturePage(page: PageLike, url: string, screenshotDir: string): Promise<RawPage> {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
-  await page.waitForLoadState('networkidle')
+  // Bounded: pages with polling/websocket traffic may never reach Playwright's networkidle.
+  await settleNetwork(page, 10_000)
+  // CSR SPAs can pass networkidle before hydration renders anything — without this wait the
+  // captured HTML is an empty shell (zero links) and BFS starves at depth 0.
+  await waitForClientRender(page)
 
   const finalUrl = page.url()
   const title = await page.title()
@@ -153,6 +158,13 @@ export type CrawlOpts = {
    * takes effect when `discover` is set, since BFS discovery is what produces edges.
    */
   onEdge?: (edge: NavEdge) => void
+  /**
+   * Concrete screen paths (from the static screen inventory) to guarantee the crawl visits, even
+   * when nothing in the app links to them — so the screen-coverage denominator is reachable. Only
+   * takes effect when `discover` is set (they are enqueued into BFS at depth 0). Templated paths
+   * (containing `:`) are dropped here: only concrete paths can be navigated to.
+   */
+  seedPaths?: string[]
 }
 
 export async function crawlWithBrowser(
@@ -214,7 +226,16 @@ export async function crawlWithBrowser(
     // so the crawl reaches more pages. Merge deduped, capped at discover.maxPages total.
     if (opts.discover) {
       const scenarioPageCount = rawPages.length
-      const discovered = await discoverPages(page, target, opts.discover, true, opts.onEdge)
+      // Only concrete paths can be navigated to — a templated `/hotel/:id` is not a real URL.
+      const seedPaths = (opts.seedPaths ?? []).filter((p) => !p.includes(':'))
+      const discovered = await discoverPages(
+        page,
+        target,
+        opts.discover,
+        opts.discover.clickDiscovery ?? true,
+        opts.onEdge,
+        seedPaths,
+      )
       const seen = new Set(rawPages.map((p) => normalizeUrl(p.url)))
       for (const d of discovered) {
         if (rawPages.length >= opts.discover.maxPages) break
